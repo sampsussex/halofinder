@@ -271,16 +271,15 @@ def find_p_M(ra1, dec1, ra2, dec2, z_group, z_gal, group_halo_mass, omega_matter
     float
         Float with probabilty of membership. Units are dimensionless.
     """
-    if ra1 == ra2 and dec1 == dec2 and z_group == z_gal:
-        return np.inf
+    #if ra1 == ra2 and dec1 == dec2 and z_group == z_gal:
+    #    return np.inf
     
-    else:
-        projected_sep = find_projected_separation(ra1, dec1, ra2, dec2, z_group, omega_matter)
-    
-        delta_z = find_delta_z(z_gal, z_group)
+    #else:
+    projected_sep = find_projected_separation(ra1, dec1, ra2, dec2, z_group, omega_matter)
 
-        C = 299792.458
+    delta_z = find_delta_z(z_gal, z_group)
 
-        H0 = h * 100.
-        # Changed h0/C to c/H0
-        return H0/C * find_NFW_sigma(projected_sep, group_halo_mass, z_group, omega_matter) * find_p_delta_z(delta_z, z_group, group_halo_mass, omega_matter)
+    C = 299792.458
+
+    H0 = h * 100.
+    return H0/C * find_NFW_sigma(projected_sep, group_halo_mass, z_group, omega_matter) * find_p_delta_z(delta_z, z_group, group_halo_mass, omega_matter)

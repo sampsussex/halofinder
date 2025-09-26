@@ -16,8 +16,8 @@ if __name__ == "__main__":
     # Load configuration
     config_reader = ConfigReader(config_file)
     config_reader.load_config()
-    config_reader.validate_config()
-    config_reader.print_config_summary()  # Added missing parentheses
+    #config_reader.validate_config()
+    #config_reader.print_config_summary()  # Added missing parentheses
     
     #for i in bs_to_trial:
 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
         #tinker_finder = TinkerFinder(config_reader)
         #tinker_finder.b_threshold = i
 
-        res = minimize_scalar(objective_function, bounds=(0.1, 30), method="bounded")
+        res = minimize_scalar(objective_function, bounds=(1, 5), method="bounded")
 
         best_x_cont = res.x
         best_score_cont = -res.fun

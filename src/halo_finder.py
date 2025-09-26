@@ -13,11 +13,10 @@ from bijective_matching import s_score
 
 #
 # To do list - For MVP
-# Implement abuncance matching for halo mass assignment correctly.!!!!!!!!!!!!!!!!!
 # K corrections on group luminosities will be a nightmare but needs to be done
 # 5logh needs to be in magnitudes, which are all in absolute mags
-# Take in k corrections from input.
-# Look at luinosity function scaling relation tuning from Robotham 2011
+# Take in k corrections from input gal catalog.
+# Score to beat: S_tot = 0.3601092310748732
 #
 # For paper
 # Implement completeness correction
@@ -26,12 +25,12 @@ from bijective_matching import s_score
 # Red vs blue?
 
 # Tidy ups; 
-# 1) repackage into src folder
+
 # 2) sort issues when group queries member galaxy
 # 3) check that there are no halos without a central galaxy
 # 4) Probably need to relook at logic on groupfindering to see if there are simpliciations
 # 5) Flagging changes could be updating group properties a lot quicker. (Halo Mass probs not though)
-# 6) Stop all this saving and loading nonsense. Make output dir with subfolders if needed. 
+# 7) rejig lf function. 
 
 # ------------------------
 # Set up logging
@@ -128,6 +127,7 @@ class HaloFinder:
             self.ra = np.array(data[column_names['ra']], dtype='float64')
             self.dec = np.array(data[column_names['dec']], dtype='float64')
             self.abs_mag = np.array(data[column_names['absolute_magnitude']], dtype='float64')
+            #self.k_corr = np.array(data[column_names['k_correction']], dtype='float64')
 
             
             # Handle group ID - might be same as galaxy ID for some datasets
@@ -349,17 +349,17 @@ class HaloFinder:
     def debugging_plots(self):
         logging.info("Creating debugging plots...")
         #Halo masses
-        plt.hist(np.log10(self.group_halo_masses), log=True, bins=25)
+        plt.hist(np.log10(self.group_halo_masses * 1e14), log=True, bins=25)
         plt.title('Halo Mass Histogram')
-        plt.xlabel('log10(Halo Mass / $10^{14}h^{-1}$)')
+        plt.xlabel('log10(Halo Mass / $h^{-1}$)')
         plt.ylabel('Freq.')
         plt.savefig(f'{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}.png')
         plt.clf()
 
         #Halo luminosities
-        plt.hist(np.log10(self.group_luminosities), log=True, bins = 25)
+        plt.hist(np.log10(self.group_luminosities*1e14), log=True, bins = 25)
         plt.title('Halo Luminosity Histogram')
-        plt.xlabel('log10(Luminosity / $10^{14}h^{-1}$)')
+        plt.xlabel('log10(Luminosity)')
         plt.ylabel('Freq.')
         plt.savefig(f'{self.plot_save_dir}/halo_luminosities_iter_{self.iteration_counter}.png')
         plt.clf()
@@ -383,10 +383,10 @@ class HaloFinder:
 
 
         # Halo L vs M
-        plt.scatter(np.log10(self.group_halo_masses), np.log10(self.group_luminosities), s=0.1)
+        plt.scatter(np.log10(self.group_halo_masses*1e14), np.log10(self.group_luminosities*1e14), s=0.1)
         plt.title("Halo mass vs Luminosity")
-        plt.xlabel('log10(Halo Mass / $10^{14}h^{-1}$)')
-        plt.ylabel('log10(Luminosity / $10^{14}h^{-1}$)')
+        plt.xlabel('log10(Halo Mass / h^{-1}$)')
+        plt.ylabel('log10(Luminosity /h^{-1}$)')
 
         plt.savefig(f'{self.plot_save_dir}/halo_m_vs_l_iter_{self.iteration_counter}.png')
         plt.clf()

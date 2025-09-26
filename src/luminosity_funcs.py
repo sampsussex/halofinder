@@ -52,7 +52,7 @@ def luminosity_correction_factor(m_lim, z, phi_star, M_star, alpha, omega_matter
     int_lf_total = simpson_integrate_with_params(-30., -14., phi_star, M_star, alpha)
     int_lf_to_lim = simpson_integrate_with_params(-30., lf_M_lim, phi_star, M_star, alpha)
     
-    return int_lf_total / int_lf_to_lim
+    return 1.04 * int_lf_total / int_lf_to_lim
 
 
 def generate_hmf(hmf_z, m_min, m_max, dlog10m, h, omega_matter):

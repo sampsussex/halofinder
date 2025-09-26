@@ -1,10 +1,9 @@
 import numpy as np
 from collections import Counter
 from typing import List
-from numba import njit
 
 
-@njit
+
 def bijcheck(group_ids_1: List[int], group_ids_2: List[int], min_group_size: int):
     """
     Bijective comparison between two group catalogues as per Robotham+2011.
@@ -108,7 +107,6 @@ def bijcheck(group_ids_1: List[int], group_ids_2: List[int], min_group_size: int
     return e_num, e_den, q_num, q_den
 
 
-@njit
 def s_score(measured_groups: List[int], mock_groups: List[int], groupcut: int) -> float:
     """
     The final S-score measurement for comparisons between two group catalogues.
@@ -125,7 +123,7 @@ def s_score(measured_groups: List[int], mock_groups: List[int], groupcut: int) -
     e_num_mock, e_den_mock, q_num_mock, q_den_mock = bijcheck(mock_groups, measured_groups, groupcut)
     e_num_meas, e_den_meas, q_num_meas, q_den_meas = bijcheck(measured_groups, mock_groups, groupcut)
     
-    mock_e = e_num_mock , e_den_mock
+    mock_e = e_num_mock / e_den_mock
     fof_e = e_num_meas / e_den_meas
     mock_q = q_num_mock / q_den_mock
     fof_q = q_num_meas / q_den_meas

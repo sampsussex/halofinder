@@ -1,6 +1,5 @@
 import numpy as np
 from numba import njit, prange
-from cosmo_funcs import absolute_magnitude_limit, distance_modulus, get_all_comoving_volumes
 from luminosity_funcs import luminosity_correction_factor
 
 
