@@ -1,6 +1,6 @@
 import numpy as np
 from numba import njit
-from cosmo_funcs import find_delta_z, find_projected_separation, Hubble
+from src.cosmo_funcs import find_delta_z, find_projected_separation, Hubble
 from astropy.constants import c, G
 from astropy import units as u
 #H = 0.704 # # Hubble constant in units of 100 km/s/Mpc

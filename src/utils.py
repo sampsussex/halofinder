@@ -71,6 +71,10 @@ class ConfigReader:
         """Get bijective matching options."""
         return self.config['mock_comparison_options']
     
+    def get_lf_options(self) -> Dict[str, float]:
+        """Get luminosity function options."""
+        return self.config['luminosity_function_options']
+    
     def should_run_module(self, module_name: str) -> bool:
         """
         Check if a specific module should be run.

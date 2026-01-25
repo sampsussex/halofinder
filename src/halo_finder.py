@@ -16,6 +16,7 @@ from bijective_matching import s_score
 # K corrections on group luminosities will be a nightmare but needs to be done
 # 5logh needs to be in magnitudes, which are all in absolute mags
 # Take in k corrections from input gal catalog.
+
 # Score to beat: S_tot = 0.3601092310748732
 #
 # For paper
@@ -88,6 +89,11 @@ class HaloFinder:
         self.hmf_redshift = hmf_options['hmf_redshift']
         self.hmf_dlog10m = hmf_options['hmf_dlog10m']
 
+        # get lf params
+        lf_options = config_reader.get_lf_options()
+        self.lf_phi_star = lf_options['phi_star']
+        self.lf_M_star = lf_options['M_star']
+        self.lf_alpha = lf_options['alpha']
 
         # Get mock comparison options
         mock_options = config_reader.get_mock_comparison_options()
@@ -127,7 +133,7 @@ class HaloFinder:
             self.ra = np.array(data[column_names['ra']], dtype='float64')
             self.dec = np.array(data[column_names['dec']], dtype='float64')
             self.abs_mag = np.array(data[column_names['absolute_magnitude']], dtype='float64')
-            #self.k_corr = np.array(data[column_names['k_correction']], dtype='float64')
+            self.k_corr = np.array(data[column_names['k_correction']], dtype='float64')
 
             
             # Handle group ID - might be same as galaxy ID for some datasets
@@ -161,16 +167,6 @@ class HaloFinder:
         # Log what was loaded
         logging.info(f"Galaxy data extracted: {len(self.gal_ids)} galaxies")
         logging.info(f"Columns loaded: IDs, redshift, RA, Dec, absolute magnitude")
-
-
-    def load_lf_parameters(self):
-        """
-        Load Schechter function best-fit parameters and uncertainties from a .txt file.
-        """
-
-        self.phi_star = 2.957829e-03 #phi_star
-        self.M_star = -2.227013e+01 #M_star
-        self.alpha = -1.109065e+00 #alpha
 
 
     def generate_hmf(self):
@@ -235,7 +231,7 @@ class HaloFinder:
         #self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes= luminosity_weighted_centers(self.gal_luminosities, self.ra, self.dec, self.zobs, self.group_ids, self.phi_star, self.M_star, self.alpha, self.mag_limit) 
         self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes = brightest_galaxy_centers(self.gal_luminosities, self.ra, 
                                                                                                                                                                       self.dec, self.zobs, self.group_ids, 
-                                                                                                                                                                      self.phi_star, self.M_star, self.alpha, 
+                                                                                                                                                                      self.lf_phi_star, self.lf_M_star, self.lf_alpha, 
                                                                                                                                                                       self.mag_limit, self.omega_matter, 
                                                                                                                                                                       self.h) 
         logging.info('Lists updated successfully')
@@ -415,7 +411,6 @@ class TinkerFinder(HaloFinder):
     def run(self):
         logging.info("Running the Tinker Finder...")
         self.load_catalogue_data()
-        self.load_lf_parameters()
         self.generate_hmf()
         self.get_all_comoving_distances()
         self.create_KDE_tree()
