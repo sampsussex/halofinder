@@ -6,7 +6,7 @@ import logging
 import matplotlib.pyplot as plt
 from cosmo_funcs import get_all_comoving_distance, find_all_spherical_to_cartesian, get_all_magnitude_to_luminosity, get_all_luminosity_to_magnitude
 from group_properties_funcs import find_all_initial_mass_to_light, brightest_galaxy_centers
-from luminosity_funcs import update_halo_masses, placeholder_k_corr, generate_hmf
+from luminosity_funcs import update_halo_masses, k_corr, generate_hmf
 from group_finding_funcs import update_group_membership_tinker
 from utils import ConfigReader
 from bijective_matching import s_score
@@ -233,7 +233,7 @@ class HaloFinder:
         logging.info("Updating unique group list, luminosity weighted group centres and luminosities...")
         
         #self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes= luminosity_weighted_centers(self.gal_luminosities, self.ra, self.dec, self.zobs, self.group_ids, self.phi_star, self.M_star, self.alpha, self.mag_limit) 
-        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes = brightest_galaxy_centers(self.gal_luminosities, self.ra, 
+        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_bcg_abs_mag, self.group_sizes = brightest_galaxy_centers(self.gal_luminosities, self.abs_mag, self.ra, 
                                                                                                                                                                       self.dec, self.zobs, self.group_ids, 
                                                                                                                                                                       self.phi_star, self.M_star, self.alpha, 
                                                                                                                                                                       self.mag_limit, self.omega_matter, 
@@ -242,7 +242,7 @@ class HaloFinder:
 
     def update_group_halo_masses(self):
         logging.info("Updating halo masses from Luminosity rank assignment...")
-        self.group_k_corrs = placeholder_k_corr(self.group_centres_z)
+        self.group_bcg_k_corrs = k_corr(self.group_centres_z)
         
 
         self.group_magnitudes = get_all_luminosity_to_magnitude(self.group_luminosities, self.abs_mag_sun)
@@ -251,7 +251,7 @@ class HaloFinder:
         plt.title('Halo Luminosity Histogram Pre Mass Assignment')
         plt.savefig(f'{self.plot_save_dir}/halo_luminosities_iter_{self.iteration_counter}_pre_mass_assignment.png')
         plt.clf()
-        plt.hist(self.group_k_corrs)
+        plt.hist(self.group_bcg_k_corrs)
         plt.title('Group K-corrections')
         plt.savefig(f'{self.plot_save_dir}/group_k_corrections_iter_{self.iteration_counter}.png')
         plt.clf()
@@ -279,8 +279,8 @@ class HaloFinder:
 
 
 
-        self.group_halo_masses = update_halo_masses(self.group_magnitudes, self.group_centres_z, 
-                                                    self.group_k_corrs, self.mag_limit, 
+        self.group_halo_masses = update_halo_masses(self.group_magnitudes, self.group_centres_z,
+                                                    self.group_bcg_abs_mag, self.group_bcg_k_corrs, self.mag_limit, 
                                                     self.survey_fractional_area, self.hmf_masses, 
                                                     self.hmf_mass_intervals, self.omega_matter, 
                                                     self.h)

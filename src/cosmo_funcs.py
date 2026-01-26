@@ -5,7 +5,7 @@ from astropy.constants import c
 
 @njit
 def Hubble(z, omega_matter):
-    """ Get the Hubble parameter at redshift z. Flat LCDM Cosmology specified in global variables. In units of km/s/Mpc.
+    """ Get the Hubble parameter at redshift z. Flat LCDM Cosmology specified in global variables. In units of km/s/Mpc h^-1.
     Parameters:
         z (float): redshift
         omega_matter (float): Matter density parameter at z=0

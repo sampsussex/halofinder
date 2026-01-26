@@ -186,12 +186,17 @@ def get_zlims(zs, abs_mags, k_corrs, z_max, survey_mag_lim, omega_matter, h):
         abs_val = abs_mags[i]
         k_val = k_corrs[i]
 
-        val = ddm(z_max, abs_val, k_val, survey_mag_lim, omega_matter, h)
-
-        if val > 0:
+        # If still visible at z_max, vmax uses z_max
+        if ddm(z_max, abs_val, k_val, survey_mag_lim, omega_matter, h) > 0.0:
             zlim[i] = z_max
         else:
-            zlim[i] = bisection_ddm(zs[i], 5.0, abs_val, k_val, survey_mag_lim, omega_matter, h)
+            # Root should lie in [0, z_max] (if it exists)
+            z_root = bisection_ddm(0.0, z_max, abs_val, k_val, survey_mag_lim, omega_matter, h)
+            if np.isnan(z_root):
+                # If no root, safest is zlim=zs (gives minimal vmax, avoids crushing phi)
+                zlim[i] = zs[i]
+            else:
+                zlim[i] = z_root
 
     return zlim
 
@@ -237,15 +242,17 @@ def histogram_numba(x, bins, weights=None):
 
 
 @njit
-def generate_empircal_lf(abs_mags, zs,  k_corrs, survey_mag_lim, survey_area_fraction, omega_matter, h):
+def generate_empircal_lf(group_abs_mags, group_zs,  bcg_abs_mags, bcg_k_corrs, survey_mag_lim, survey_area_fraction, omega_matter, h):
     """ Generate empirical luminosity function using 1/Vmax method.
     Parameters
     ----------
-    abs_mags : array
-        Absolute magnitudes of galaxies.
-    zs : array
+    group_abs_mags : array
+        Absolute magnitude of the groups.
+    group_zs : array
         Redshifts of galaxies.
-    k_corrs : array
+    bcg_abs_mags : array
+        Absolute magnitudes of brightest cluster galaxies.
+    bcg_k_corrs : array
         K-corrections for galaxies.
     survey_mag_lim : float
         Apparent magnitude limit of the survey.
@@ -262,13 +269,13 @@ def generate_empircal_lf(abs_mags, zs,  k_corrs, survey_mag_lim, survey_area_fra
     bins : array
         Magnitude bins.
     """
-    abs_mag_max = np.max(abs_mags)
-    abs_mag_min = np.min(abs_mags)
-    z_max = np.max(zs)
+    abs_mag_max = np.max(group_abs_mags)
+    abs_mag_min = np.min(group_abs_mags)
+    z_max = np.max(group_zs)
 
-    zlims = get_zlims(zs, abs_mags, k_corrs, z_max, survey_mag_lim, omega_matter, h) #zs, abs_mags, k_corrs, z_max, survey_mag_lim
+    zlims = get_zlims(group_zs, bcg_abs_mags, bcg_k_corrs, z_max, survey_mag_lim, omega_matter, h) #zs, abs_mags, k_corrs, z_max, survey_mag_lim
 
-    vs = survey_area_fraction * get_all_comoving_volumes(zs, omega_matter)
+    #vs = survey_area_fraction * get_all_comoving_volumes(zs, omega_matter)
 
     vmaxs = survey_area_fraction * get_all_comoving_volumes(zlims, omega_matter)
 
@@ -276,7 +283,7 @@ def generate_empircal_lf(abs_mags, zs,  k_corrs, survey_mag_lim, survey_area_fra
 
     bins = np.linspace(abs_mag_min, abs_mag_max, 50)
 
-    phi = histogram_numba(abs_mags, bins=bins, weights= 1.0 / vmaxs)
+    phi = histogram_numba(group_abs_mags, bins=bins, weights= 1.0 / vmaxs)
     return phi, bins
 
 
@@ -298,29 +305,34 @@ def integrate_lf(phi, bins, integral_mag_limit):
     float
         Integrated number density down to mag_limit in h^3 Mpc^-3.
     """
+    # bins are ascending: bright (more negative) -> faint
+    if integral_mag_limit <= bins[0]:
+        return 0.0
+    if integral_mag_limit >= bins[-1]:
+        # integrate full range
+        bin_widths = np.diff(bins)
+        return np.sum(phi * bin_widths)
+
     bin_widths = np.diff(bins)
 
-    # find which bin contains mag_limit
     idx = np.searchsorted(bins, integral_mag_limit) - 1
     if idx < 0:
         idx = 0
-    if idx >= len(phi):
-        idx = len(phi) - 1
+    if idx >= phi.size:
+        idx = phi.size - 1
 
-    # fully brighter bins
+    # full bins strictly brighter than limit
     full_contrib = np.sum(phi[:idx] * bin_widths[:idx])
 
-    # partial bin (linear interpolation to mag_limit)
-    m_left, m_right = bins[idx], bins[idx+1]
-    phi_left = phi[idx]
-    phi_right = phi[idx]  # constant per bin histogram
+    # partial bin
+    m_left = bins[idx]
+    m_right = bins[idx + 1]
     frac = (integral_mag_limit - m_left) / (m_right - m_left)
-    phi_at_limit = phi_left + (phi_right - phi_left) * frac
-    avg_phi = 0.5 * (phi_left + phi_at_limit)
-    partial_width = integral_mag_limit - m_left
-    partial_contrib = avg_phi * partial_width
 
-    return (full_contrib + partial_contrib) 
+    # constant within bin (histogram)
+    partial_contrib = phi[idx] * (integral_mag_limit - m_left)
+
+    return full_contrib + partial_contrib
 
 
 @njit
@@ -367,15 +379,21 @@ def match_hmf_single(n_target, hmf_masses, dn_dlogM):
     n_cum = cumulative_hmf(hmf_masses, dn_dlogM)
     logM = np.log10(hmf_masses)
 
-    # linear interpolation in reverse order
-    for i in range(len(hmf_masses)-1):
-        n1, n2 = n_cum[i], n_cum[i+1]
+    # If outside range, clamp instead of always max-mass
+    n_hi = n_cum[0]          # at low mass
+    n_lo = n_cum[-2]         # last non-zero-ish (since last is 0)
+    if n_target >= n_hi:
+        return hmf_masses[0]     # very abundant -> low mass
+    if n_target <= n_lo:
+        return hmf_masses[-1]    # very rare -> high mass
+
+    for i in range(len(hmf_masses) - 1):
+        n1, n2 = n_cum[i], n_cum[i + 1]
         if (n1 >= n_target >= n2) or (n1 <= n_target <= n2):
             frac = (n_target - n1) / (n2 - n1)
-            logM_thresh = logM[i] + frac * (logM[i+1] - logM[i])
-            return 10.0**logM_thresh
-    # if we reach here, n_target is outside the range of n_cum
-    
+            logM_thresh = logM[i] + frac * (logM[i + 1] - logM[i])
+            return 10.0 ** logM_thresh
+
     return hmf_masses[-1]
 
 
@@ -408,7 +426,7 @@ def lf_to_hmf_match(integral_mag_limits, phi, bins, hmf_masses, dn_dlogM):
     return halo_masses
 
 @njit
-def update_halo_masses(abs_mags, zs, k_corrs, survey_mag_limit, survey_fractional_area, hmf_masses, dn_dlogM, omega_matter, h):
+def update_halo_masses(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, survey_mag_limit, survey_fractional_area, hmf_masses, dn_dlogM, omega_matter, h):
     """
     Main function to update halo masses based on luminosity function matching.
     Parameters
@@ -417,7 +435,9 @@ def update_halo_masses(abs_mags, zs, k_corrs, survey_mag_limit, survey_fractiona
         Absolute magnitudes of galaxies.
     zs : array
         Redshifts of galaxies.
-    k_corrs : array
+    bcg_abs_mags : array
+        Absolute magnitudes of brightest cluster galaxies.
+    bcg_k_corrs : array
         K-corrections for galaxies.
     survey_mag_limit : float
         Apparent magnitude limit of the survey.
@@ -436,7 +456,7 @@ def update_halo_masses(abs_mags, zs, k_corrs, survey_mag_limit, survey_fractiona
     matched_masses : array
         Array of halo mass thresholds in 10^14 h^-1 Msun corresponding to each galaxy.
     """
-    phi, bins = generate_empircal_lf(abs_mags, zs, k_corrs, survey_mag_limit, survey_fractional_area, omega_matter, h)
+    phi, bins = generate_empircal_lf(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, survey_mag_limit, survey_fractional_area, omega_matter, h)
 
     matched_masses = lf_to_hmf_match(abs_mags, phi, bins, hmf_masses, dn_dlogM)
 
@@ -444,7 +464,7 @@ def update_halo_masses(abs_mags, zs, k_corrs, survey_mag_limit, survey_fractiona
 
 
 @njit
-def placeholder_k_corr(zs):
+def k_corr(zs):
     z_ref = 0
     Q_z_ref = 1.75
     z_p = 0.2

@@ -68,6 +68,7 @@ def update_group_membership_tinker(
     updated_galaxy_group_id = galaxy_group_id.copy()
     updated_is_central = is_central.copy()
     updated_is_satellite = is_satellite.copy()
+    #changed_satellite = np.zeros(n_galaxies, dtype=np.bool_)
     
     # Create mapping from group_id to group index
     max_group_id = np.max(group_ids)
@@ -108,7 +109,7 @@ def update_group_membership_tinker(
         
         # Query nearby galaxies
         query_point = group_coords[group_idx]
-        k = min(1000, n_galaxies)
+        k = min(500, n_galaxies)
         distances, indices, extra = galaxy_tree.query(query_point, k=k)
         flat_indices = indices[0]
         
@@ -127,15 +128,24 @@ def update_group_membership_tinker(
             if prob < 0:  # This was the central itself
                 continue
                 
-            # Skip if already assigned as satellite
-            if updated_is_satellite[neighbor_idx]:
+            # Skip if already assigned as satellite of this group
+            if updated_galaxy_group_id[neighbor_idx] == group_ids[group_idx]:
                 continue
+
+            # Skip if already a satellite of a more massive group
+            if updated_is_satellite[neighbor_idx]:
+                neighbor_group_idx = group_id_to_idx[updated_galaxy_group_id[neighbor_idx]]
+                if neighbor_group_idx >= 0 and group_halo_mass[neighbor_group_idx] > group_halo_mass[group_idx]:
+                    continue
+
                 
-            # Skip if it's a central of a more massive group
+            # Skip if it's a central of a more massive group 
             if updated_is_central[neighbor_idx]:
                 neighbor_group_idx = group_id_to_idx[updated_galaxy_group_id[neighbor_idx]]
                 if neighbor_group_idx >= 0 and group_halo_mass[neighbor_group_idx] >= group_halo_mass[group_idx]:
                     continue
+
+            
             
             # Assign as satellite if probability exceeds threshold
             if prob > threshold:
