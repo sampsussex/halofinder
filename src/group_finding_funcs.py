@@ -53,7 +53,7 @@ def update_group_membership_tinker(
     - group_dec: Declination of groups in degrees
     - group_z: Redshift of groups
     - group_sizes: Sizes of each group (number of galaxies in each group)
-    - group_halo_mass: Halo mass of each group in units of 10^14 h^-1 M_sun
+    - group_halo_mass: Halo mass of each group in units of log10(h^-1 M_sun)
     - galaxy_tree: KDTree for galaxy positions in spherical coordinates
     - is_central: input boolean array indicating current central galaxies
     - is_satellite: input boolean array indicating current satellite galaxies

@@ -117,7 +117,6 @@ class HaloFinder:
         logging.info(f"Max iterations set to {self.max_iterations}")
         logging.info(f"Magnitude limit set to {self.mag_limit}")
         logging.info(f"Data load path: {self.data_load_path}")
-        logging.info(f"B parameter threshold: {self.b_threshold}")
         logging.info(f"Save path: {self.save_path}")
 
 
@@ -244,7 +243,7 @@ class HaloFinder:
         logging.info("Updating unique group list, luminosity weighted group centres and luminosities...")
         
         #self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes= luminosity_weighted_centers(self.gal_luminosities, self.ra, self.dec, self.zobs, self.group_ids, self.phi_star, self.M_star, self.alpha, self.mag_limit) 
-        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_bcg_abs_mag, self.group_sizes = brightest_galaxy_centers(self.gal_luminosities, self.abs_mag, self.is_red, self.ra, 
+        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_bcg_abs_mag, self.group_sizes, self.group_central_is_red = brightest_galaxy_centers(self.gal_luminosities, self.abs_mag, self.is_red, self.ra, 
                                                                                                                                                                       self.dec, self.zobs, self.group_ids, 
                                                                                                                                                                       self.lf_phi_star, self.lf_M_star, self.lf_alpha, 
                                                                                                                                                                       self.mag_limit, self.omega_matter, 
@@ -284,19 +283,27 @@ class HaloFinder:
 
         plt.bar(np.log10(self.hmf_masses), self.hmf_mass_intervals, width=0.1)
         plt.title('Halo Mass Function Intervals')
-        plt.xlabel('log10(Halo Mass / $10^{14}h^{-1}$)')
+        plt.xlabel('log10(Halo Mass / $h^{-1} M_{\\odot}$)')
         plt.ylabel('dn/dlogM')
         plt.savefig(f'{self.plot_save_dir}/hmf_intervals_iter_{self.iteration_counter}.png')
         plt.clf()
 
-
-
-        self.group_halo_masses = update_halo_masses(self.group_magnitudes, self.group_centres_z,
-                                                    self.group_bcg_abs_mag, self.group_bcg_k_corrs, self.mag_limit, 
-                                                    self.survey_fractional_area, self.hmf_masses, 
-                                                    self.hmf_mass_intervals, self.omega_matter, 
-                                                    self.h)
-        plt.hist(np.log10(1e14*self.group_halo_masses), log=True, bins=25)
+        self.group_halo_masses = update_halo_masses(
+            self.group_magnitudes,
+            self.group_centres_z,
+            self.group_bcg_abs_mag,
+            self.group_bcg_k_corrs,
+            self.group_central_is_red,
+            self.mag_limit,
+            self.survey_fractional_area,
+            self.hmf_masses,
+            self.hmf_mass_intervals,
+            self.omega_matter,
+            self.h,
+            self.red_effective_luminosity_boost_a,
+            self.red_effective_luminosity_boost_b,
+        )
+        plt.hist(self.group_halo_masses, bins=25)
 
         plt.savefig(f'{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}_post_mass_assignment.png')
         plt.clf()
@@ -356,15 +363,15 @@ class HaloFinder:
 
         self.s_tot = score
         # Save the S-score to a file
-        np.savetxt(self.s_tot_save_path + '_B:' + str(self.b_threshold), [score], header='S-score', fmt='%.6f')
+        np.savetxt(self.s_tot_save_path, [score], header='S-score', fmt='%.6f')
 
 
     def debugging_plots(self):
         logging.info("Creating debugging plots...")
         #Halo masses
-        plt.hist(np.log10(self.group_halo_masses * 1e14), log=True, bins=25)
+        plt.hist(self.group_halo_masses, bins=25)
         plt.title('Halo Mass Histogram')
-        plt.xlabel('log10(Halo Mass / $h^{-1}$)')
+        plt.xlabel('log10(Halo Mass / $h^{-1} M_{\\odot}$)')
         plt.ylabel('Freq.')
         plt.savefig(f'{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}.png')
         plt.clf()
@@ -396,9 +403,9 @@ class HaloFinder:
 
 
         # Halo L vs M
-        plt.scatter(np.log10(self.group_halo_masses*1e14), np.log10(self.group_luminosities*1e14), s=0.1)
+        plt.scatter(self.group_halo_masses, np.log10(self.group_luminosities*1e14), s=0.1)
         plt.title("Halo mass vs Luminosity")
-        plt.xlabel('log10(Halo Mass / h^{-1}$)')
+        plt.xlabel('log10(Halo Mass / $h^{-1} M_{\\odot}$)')
         plt.ylabel('log10(Luminosity /h^{-1}$)')
 
         plt.savefig(f'{self.plot_save_dir}/halo_m_vs_l_iter_{self.iteration_counter}.png')

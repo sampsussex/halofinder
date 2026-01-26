@@ -5,7 +5,7 @@ from hmf import MassFunction
 from hmf import cosmo
 from astropy.cosmology import FlatLambdaCDM
 import logging
-from numba import njit
+from numba import njit, prange
 from cosmo_funcs import distance_modulus, get_all_comoving_volumes, absolute_magnitude_limit
 
 @njit
@@ -65,7 +65,7 @@ def generate_hmf(hmf_z, m_min, m_max, dlog10m, h, omega_matter):
         h (float): Dimensionless Hubble parameter
         omega_matter (float): Matter density parameter
     Returns:
-        tuple: (halo_masses, dn_dlogM) where halo_masses is an array of log10 halo masses and dn_dlogM is the differential number density
+        tuple: (halo_masses, dn_dlogM) where halo_masses is an array of halo masses (h^-1 Msun) and dn_dlogM is the differential number density
     """
 
     astropy_cosmo = FlatLambdaCDM(H0=h * 100, Om0=omega_matter)
@@ -397,7 +397,7 @@ def match_hmf_single(n_target, hmf_masses, dn_dlogM):
     return hmf_masses[-1]
 
 
-@njit
+@njit(parallel=True)
 def lf_to_hmf_match(group_integral_mag_limits, bcg_is_red, phi, bins, hmf_masses, dn_dlogM, red_mag_boost_a, red_mag_boost_b):
     """
     Wrapper: for array of mag_limits, return array of halo mass thresholds.
@@ -430,7 +430,7 @@ def lf_to_hmf_match(group_integral_mag_limits, bcg_is_red, phi, bins, hmf_masses
     boosted_mag_limits = np.empty(len(group_integral_mag_limits))
     halo_masses = np.empty(len(group_integral_mag_limits))
 
-    for i in range(len(group_integral_mag_limits)):
+    for i in prange(len(group_integral_mag_limits)):
         if bcg_is_red[i]:
             boosted_mag_limits[i] = group_integral_mag_limits[i] - (red_mag_boost_a + red_mag_boost_b * ( -group_integral_mag_limits[i] - 20.0))
             halo_masses[i] = match_hmf_single(integrate_lf(phi, bins, boosted_mag_limits[i]), hmf_masses, dn_dlogM)
@@ -454,6 +454,8 @@ def update_halo_masses(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, bcg_is_red, surv
         Absolute magnitudes of brightest cluster galaxies.
     bcg_k_corrs : array
         K-corrections for galaxies.
+    bcg_is_red : array
+        Boolean array indicating if the brightest cluster galaxy is classified as red.
     survey_mag_limit : float
         Apparent magnitude limit of the survey.
     survey_fractional_area : float
@@ -466,16 +468,20 @@ def update_halo_masses(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, bcg_is_red, surv
         Matter density parameter.
     h : float
         Dimensionless Hubble parameter.
+    red_mag_boost_a : float
+        Parameter for red galaxy magnitude boost.
+    red_mag_boost_b : float
+        Parameter for red galaxy magnitude boost.
     Returns
     -------
     matched_masses : array
-        Array of halo mass thresholds in 10^14 h^-1 Msun corresponding to each galaxy.
+        Array of halo mass thresholds in log10(h^-1 Msun) corresponding to each galaxy.
     """
     phi, bins = generate_empircal_lf(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, survey_mag_limit, survey_fractional_area, omega_matter, h)
 
     matched_masses = lf_to_hmf_match(abs_mags, bcg_is_red, phi, bins, hmf_masses, dn_dlogM, red_mag_boost_a, red_mag_boost_b)
 
-    return matched_masses / 1e14  # convert to 10^14 h^-1 Msun for consistency with other code
+    return np.log10(matched_masses)
 
 
 @njit

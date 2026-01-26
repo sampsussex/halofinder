@@ -44,7 +44,7 @@ def find_halo_r(halo_mass, z_group, omega_matter, delta_crit=200.):
     Parameters:
     ----------
     halo_mass : float
-        Halo mass in units of 10**14 h-1 M_sun
+        Halo mass in units of log10(h^-1 M_sun)
     z_group : float
         Redshift of the group
     omega_matter : float
@@ -57,7 +57,7 @@ def find_halo_r(halo_mass, z_group, omega_matter, delta_crit=200.):
         Radius of the halo in Mpc h -1
     """
 
-    mass = halo_mass * 1e14
+    mass = 10**halo_mass
     return (3 * mass / (4 * np.pi * delta_crit * find_rho_crit(z_group, omega_matter) * find_Om(z_group, omega_matter)))**(1/3)
 
 
@@ -67,7 +67,7 @@ def find_concentration_ratio(halo_mass, z = None, concentraion_relation = 'Dutto
     Parameters:
     ----------
     halo_mass : float
-        Halo mass in units of 10**14 h-1 M_sun
+        Halo mass in units of log10(h^-1 M_sun)
     concentraion_relation : str, optional
         Concentration relation to use. Default is 'DuttonMaccio14'.
     delta_crit : float, optional
@@ -86,7 +86,7 @@ def find_concentration_ratio(halo_mass, z = None, concentraion_relation = 'Dutto
         # Given as M200 for halo mass in the paper. Other options available in paper.
         if delta_crit != 200.:
             raise ValueError("delta_crit must be 200 for Maccio08 concentration ratio.")
-        return 10**(0.830 - 0.098 * (np.log10(halo_mass*10**14)-12))
+        return 10**(0.830 - 0.098 * (halo_mass - 12))
 
     
     if concentraion_relation == 'DuttonMaccio14':
@@ -96,7 +96,7 @@ def find_concentration_ratio(halo_mass, z = None, concentraion_relation = 'Dutto
             raise ValueError("delta_cirt must be 200 for this implementation")
         a = 0.520 + (0.905 - 0.520) * np.exp(-0.617 * (z ** 1.21))
         b = b = -0.101 + 0.026 * z
-        m = np.log10(halo_mass*1e14/1e12)
+        m = halo_mass - 12
         return 10**(a + b * m)
 
     
@@ -160,7 +160,7 @@ def find_NFW_sigma(projected_sep, halo_mass, z_group, omega_matter):
     projected_sep : float
         Projected separation in Mpc
     halo_mass : float
-        Halo mass in units of 10**14 h^-1 M_sun
+        Halo mass in units of log10(h^-1 M_sun)
     z_group : float
         Redshift of the group
     omega_matter : float
@@ -196,7 +196,7 @@ def find_sigma_sqr(halo_mass, z_group, omega_matter, delta_crit = 200.):
     Parameters:
     ----------
     halo_mass : float
-        Halo mass in units of 10**14 h-1 M_sun
+        Halo mass in units of log10(h^-1 M_sun)
     z_group : float
         Redshift of the group
     omega_matter : float
@@ -211,7 +211,7 @@ def find_sigma_sqr(halo_mass, z_group, omega_matter, delta_crit = 200.):
     # return 632*(halo_mass*OM_M)**0.3224- old version from Yang+2021
     # Included the correct 3/5 prefactor from viral theorm
     G = 4.300917270036279e-09 # G constant in (km/s)^2 Mpc/M_sun
-    return ((6**(2/3))/5)*np.pi**(1/3) * (halo_mass*1e14)**(2/3) * G * (1+z_group) * (delta_crit * find_rho_crit(z_group, omega_matter) * find_Om(z_group, omega_matter))**(1/3)
+    return ((6**(2/3))/5)*np.pi**(1/3) * (10**halo_mass)**(2/3) * G * (1+z_group) * (delta_crit * find_rho_crit(z_group, omega_matter) * find_Om(z_group, omega_matter))**(1/3)
 
 
 @njit
@@ -224,7 +224,7 @@ def find_p_delta_z(delta_z, z_group, halo_mass, omega_matter):
     z_group : float
         Redshift of the group
     halo_mass : float
-        Halo mass in units of 10**14 h-1 M_sun
+        Halo mass in units of log10(h^-1 M_sun)
     omega_matter : float
         Matter density parameter at z=0
     Returns:
@@ -264,7 +264,7 @@ def find_p_M(ra1, dec1, ra2, dec2, z_group, z_gal, group_halo_mass, omega_matter
     z_gal : float
         Redshift of galaxy
     group_halo_mass : float
-        Halo mass of the group in h^-1 / (M_sun*10**14)
+        Halo mass of the group in log10(h^-1 M_sun)
         
     Returns:
     -------
