@@ -398,13 +398,15 @@ def match_hmf_single(n_target, hmf_masses, dn_dlogM):
 
 
 @njit
-def lf_to_hmf_match(integral_mag_limits, phi, bins, hmf_masses, dn_dlogM):
+def lf_to_hmf_match(group_integral_mag_limits, bcg_is_red, phi, bins, hmf_masses, dn_dlogM, red_mag_boost_a, red_mag_boost_b):
     """
     Wrapper: for array of mag_limits, return array of halo mass thresholds.
     Parameters
     ----------
-    integral_mag_limits : array
+    group_integral_mag_limits : array
         Array of absolute magnitude limits for integration.
+    bcg_is_red : array
+        Boolean array indicating if the brightest cluster galaxy is classified as red.
     phi : array
         Luminosity function values in each magnitude bin.
     bins : array
@@ -413,20 +415,33 @@ def lf_to_hmf_match(integral_mag_limits, phi, bins, hmf_masses, dn_dlogM):
         Halo masses in h^-1 Msun.
     dn_dlogM : array
         Differential HMF dn/dlogM in h^3 Mpc^-3.
+    red_mag_boost_a : float
+        Parameter for red galaxy magnitude boost.
+    red_mag_boost_b : float
+        Parameter for red galaxy magnitude boost.
+
     Returns
     -------
     halo_masses : array
 
         Array of halo mass thresholds in h^-1 Msun corresponding to each integral_mag_limit.
     """
-    halo_masses = np.empty(len(integral_mag_limits))
-    for j in range(len(integral_mag_limits)):
-        n = integrate_lf(phi, bins, integral_mag_limits[j])
-        halo_masses[j] = match_hmf_single(n, hmf_masses, dn_dlogM)
+
+    boosted_mag_limits = np.empty(len(group_integral_mag_limits))
+    halo_masses = np.empty(len(group_integral_mag_limits))
+
+    for i in range(len(group_integral_mag_limits)):
+        if bcg_is_red[i]:
+            boosted_mag_limits[i] = group_integral_mag_limits[i] - (red_mag_boost_a + red_mag_boost_b * ( -group_integral_mag_limits[i] - 20.0))
+            halo_masses[i] = match_hmf_single(integrate_lf(phi, bins, boosted_mag_limits[i]), hmf_masses, dn_dlogM)
+        else:
+            boosted_mag_limits[i] = group_integral_mag_limits[i]
+            halo_masses[i] = match_hmf_single(integrate_lf(phi, bins, boosted_mag_limits[i]), hmf_masses, dn_dlogM)
+
     return halo_masses
 
 @njit
-def update_halo_masses(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, survey_mag_limit, survey_fractional_area, hmf_masses, dn_dlogM, omega_matter, h):
+def update_halo_masses(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, bcg_is_red, survey_mag_limit, survey_fractional_area, hmf_masses, dn_dlogM, omega_matter, h, red_mag_boost_a, red_mag_boost_b):
     """
     Main function to update halo masses based on luminosity function matching.
     Parameters
@@ -458,7 +473,7 @@ def update_halo_masses(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, survey_mag_limit
     """
     phi, bins = generate_empircal_lf(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, survey_mag_limit, survey_fractional_area, omega_matter, h)
 
-    matched_masses = lf_to_hmf_match(abs_mags, phi, bins, hmf_masses, dn_dlogM)
+    matched_masses = lf_to_hmf_match(abs_mags, bcg_is_red, phi, bins, hmf_masses, dn_dlogM, red_mag_boost_a, red_mag_boost_b)
 
     return matched_masses / 1e14  # convert to 10^14 h^-1 Msun for consistency with other code
 

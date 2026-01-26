@@ -258,6 +258,7 @@ class HaloFinder:
 
         self.group_magnitudes = get_all_luminosity_to_magnitude(self.group_luminosities, self.abs_mag_sun)
 
+
         plt.hist(np.log10(self.group_luminosities*1e14), log=True, bins=25)
         plt.title('Halo Luminosity Histogram Pre Mass Assignment')
         plt.savefig(f'{self.plot_save_dir}/halo_luminosities_iter_{self.iteration_counter}_pre_mass_assignment.png')
