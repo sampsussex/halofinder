@@ -23,7 +23,7 @@ def find_group_sizes(group_ids):
 
 
 @njit(parallel=True)
-def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, phi_star, M_star, alpha, mag_limit, omega_matter, h):
+def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, is_red, phi_star, M_star, alpha, mag_limit, omega_matter, h):
     """
     Returns the group properties and locations from a list of galaxies and group assignments.
     Centers are placed at the brightest galaxy in each group.
@@ -40,6 +40,8 @@ def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, phi_star, M_star
         Redshift of galaxies
     group_ids : np.array(int)
         Numpy array of group IDs
+    is_red : np.array(bool)
+        Numpy array indicating if galaxy is classified as red
     phi_star : float
         Phi_star parameter from schechter function of galaxy population
     M_star : float
@@ -67,6 +69,8 @@ def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, phi_star, M_star
         Corrected total luminosity of each unique group
     np.array(int)
         Number galaxy members in each unique group
+    np.array(bool)
+        Boolean array indicating if the brightest galaxy in each group is red
     """
     unique_groups = np.unique(group_ids)
     n_groups = unique_groups.shape[0]
@@ -75,6 +79,7 @@ def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, phi_star, M_star
     centers_z = np.zeros(n_groups)
     centers_lum = np.zeros(n_groups)
     group_sizes = find_group_sizes(group_ids)
+    central_is_red = np.zeros(n_groups, dtype=np.bool_)
     
     for i in prange(n_groups):
         gid = unique_groups[i]
@@ -98,6 +103,8 @@ def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, phi_star, M_star
             L_corr = luminosity_correction_factor(mag_limit, Z[0], phi_star, M_star, alpha, omega_matter, h)
             #print(L_corr)
             centers_lum[i] = L[0] * L_corr
+            central_is_red[i] = is_red[mask][0]
+
         else:
             # Multi-galaxy case - find brightest galaxy
             brightest_idx = np.argmax(L)
@@ -113,5 +120,7 @@ def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, phi_star, M_star
             L_corr = luminosity_correction_factor(mag_limit, Z[brightest_idx], phi_star, M_star, alpha, omega_matter, h)
             #print(L_corr)
             centers_lum[i] = Lsum * L_corr
+            central_is_red[i] = is_red[mask][brightest_idx]
+
     
-    return unique_groups, centers_ra, centers_dec, centers_z, centers_lum, group_sizes
+    return unique_groups, centers_ra, centers_dec, centers_z, centers_lum, group_sizes, central_is_red

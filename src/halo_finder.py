@@ -57,10 +57,12 @@ class HaloFinder:
         self.iteration_group_membership = {}
         self.iteration_central_assignment = {}
         self.iteration_satellite_assignment = {}
+        #self.iteration_central_is_red = {}
 
         # Get cosmology options from config
         cosmology = config_reader.get_cosmology()
         self.h = cosmology['h']
+
         self.omega_matter = cosmology['omega_matter']
 
         # Get survey fraction area from config
@@ -72,7 +74,14 @@ class HaloFinder:
         self.mag_limit = setup_options['survey_magnitude_limit']
         self.abs_mag_sun = setup_options['abs_solar_magnitude_in_band']
         self.remove_isolated_galaxies = setup_options['remove_isolated_galaxies']
-        self.b_threshold = setup_options['b_threshold']
+        self.red_a_threshold = setup_options['red_a_threshold']
+        self.red_b_threshold = setup_options['red_b_threshold']
+        self.red_c_threshold = setup_options['red_c_threshold']
+        self.blue_a_threshold = setup_options['blue_a_threshold']
+        self.blue_b_threshold = setup_options['blue_b_threshold']
+        self.blue_c_threshold = setup_options['blue_c_threshold']
+        self.red_effective_luminosity_boost_a = setup_options['red_effective_luminosity_boost_a']
+        self.red_effective_luminosity_boost_b = setup_options['red_effective_luminosity_boost_b']
         
         # Get file paths from config
         file_locations = config_reader.get_file_locations()
@@ -134,6 +143,7 @@ class HaloFinder:
             self.dec = np.array(data[column_names['dec']], dtype='float64')
             self.abs_mag = np.array(data[column_names['absolute_magnitude']], dtype='float64')
             self.k_corr = np.array(data[column_names['k_correction']], dtype='float64')
+            self.is_red = np.array(data[column_names['galaxy_is_red']], dtype=bool)
 
             
             # Handle group ID - might be same as galaxy ID for some datasets
@@ -153,6 +163,8 @@ class HaloFinder:
                 self.dec = self.dec[mask]
                 self.abs_mag = self.abs_mag[mask]
                 self.id_group_sky = self.id_group_sky[mask]
+                self.k_corr = self.k_corr[mask]
+                self.is_red = self.is_red[mask]
                 logging.info(f"Isolated galaxies removed. Remaining galaxies: {len(self.gal_ids)}")
             
                 
@@ -229,7 +241,7 @@ class HaloFinder:
         logging.info("Updating unique group list, luminosity weighted group centres and luminosities...")
         
         #self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes= luminosity_weighted_centers(self.gal_luminosities, self.ra, self.dec, self.zobs, self.group_ids, self.phi_star, self.M_star, self.alpha, self.mag_limit) 
-        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes = brightest_galaxy_centers(self.gal_luminosities, self.ra, 
+        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes,  self.central_is_red = brightest_galaxy_centers(self.gal_luminosities, self.ra, 
                                                                                                                                                                       self.dec, self.zobs, self.group_ids, 
                                                                                                                                                                       self.lf_phi_star, self.lf_M_star, self.lf_alpha, 
                                                                                                                                                                       self.mag_limit, self.omega_matter, 
@@ -292,8 +304,9 @@ class HaloFinder:
         self.new_members, self.gal_is_central, self.gal_is_satellite = update_group_membership_tinker(
             self.ra, self.dec, self.zobs, self.group_ids,
             self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, 
-            self.group_sizes, self.group_halo_masses, self.gal_kde_tree, self.gal_is_central, self.gal_is_satellite, self.b_threshold, 
-            self.omega_matter, self.h)
+            self.group_sizes, self.group_halo_masses, self.gal_kde_tree, self.gal_is_central, self.gal_is_satellite, 
+            self.is_red, self.red_a_threshold, self.red_b_threshold, self.red_c_threshold, self.blue_a_threshold, 
+            self.blue_b_threshold, self.blue_c_threshold, self.omega_matter, self.h)
         logging.info(f"Groupfinder iteration complete, number of groups found: {len(np.unique(self.new_members))}")
 
 
@@ -423,14 +436,14 @@ class TinkerFinder(HaloFinder):
         logging.info("Tinker Finder run complete.")
 
 
-if __name__ == "__main__":
-    # Load configuration
-    config_reader = ConfigReader("config_galform.yaml")
-    config_reader.load_config()
-    #config_reader.validate_config()
+#if __name__ == "__main__":
+#    # Load configuration
+#    config_reader = ConfigReader("config_galform.yaml")
+#    config_reader.load_config()
+#    #config_reader.validate_config()
+#    # Create and run TinkerFinder
+#    
+#    finder = TinkerFinder(config_reader)
+#    finder.run()
     
-    # Create and run TinkerFinder
-    finder = TinkerFinder(config_reader)
-    finder.run()
-    
-    logging.info("Finder run complete")
+#    logging.info("Finder run complete")

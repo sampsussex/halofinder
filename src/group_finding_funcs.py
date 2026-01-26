@@ -4,6 +4,11 @@ from numba import njit, prange, float64, int64
 from cosmo_funcs import get_all_comoving_distance, find_all_spherical_to_cartesian, spherical_to_cartesian
 from halo_p_M_funcs import find_p_M
 
+@njit
+def negative_exponential_func(x, B_a, B_b, B_c):
+    """ A helper function to compute negative exponential values."""
+    return B_a * np.exp(-B_b * x) + B_c
+
 
 @njit(float64[:](int64[:], int64, float64[:], float64[:], float64[:], 
                  float64, float64, float64, float64, float64, float64), parallel=True)
@@ -33,7 +38,7 @@ def compute_probabilities_parallel(
 def update_group_membership_tinker(
     galaxy_ra, galaxy_dec, galaxy_z, galaxy_group_id,
     group_ids, group_ra, group_dec, group_z, group_sizes, group_halo_mass,
-    galaxy_tree, is_central, is_satellite, threshold, omega_matter, h
+    galaxy_tree, is_central, is_satellite, is_red, thresh_red_a, thresh_red_b, thresh_red_c, thresh_blue_a, thresh_blue_b, thresh_blue_c, omega_matter, h
 ):
     """
     Update galaxy group membership based on probability threshold.
@@ -52,7 +57,9 @@ def update_group_membership_tinker(
     - galaxy_tree: KDTree for galaxy positions in spherical coordinates
     - is_central: input boolean array indicating current central galaxies
     - is_satellite: input boolean array indicating current satellite galaxies
-    - threshold: Probability threshold for group membership assignment
+    - is_red: boolean array indicating if galaxies are classified as red
+    - thresh_red_a, thresh_red_b, thresh_red_c: Parameters for red galaxy threshold function
+    - thresh_blue_a, thresh_blue_b, thresh_blue_c: Parameters for blue galaxy threshold function
     - omega_matter: Matter density parameter at z=0
     - h: Dimensionless Hubble parameter (H0/100)
     
@@ -108,7 +115,7 @@ def update_group_membership_tinker(
         
         # Query nearby galaxies
         query_point = group_coords[group_idx]
-        k = min(1000, n_galaxies)
+        k = min(5000, n_galaxies)
         distances, indices, extra = galaxy_tree.query(query_point, k=k)
         flat_indices = indices[0]
         
@@ -138,6 +145,15 @@ def update_group_membership_tinker(
                     continue
             
             # Assign as satellite if probability exceeds threshold
+            if is_red[neighbor_idx]:
+                threshold = negative_exponential_func(
+                    group_sizes[group_idx], thresh_red_a, thresh_red_b, thresh_red_c
+                )
+            else:
+                threshold = negative_exponential_func(
+                    group_sizes[group_idx], thresh_blue_a, thresh_blue_b, thresh_blue_c
+                )
+                
             if prob > threshold:
                 updated_galaxy_group_id[neighbor_idx] = group_ids[group_idx]
                 updated_is_satellite[neighbor_idx] = True
