@@ -45,7 +45,7 @@ setup_options:
   red_effective_luminosity_boost_b: 0.1
   survey_magnitude_limit: 19.65  # Magnitude limit for the survey
   abs_solar_magnitude_in_band: 4.64  # Absolute solar magnitude
-  max_iterations: 20  # Maximum number of iterations for the group finder
+  max_iterations: 8  # Maximum number of iterations for the group finder
   remove_isolated_galaxies: False  # Set to true to remove isolated galaxies - only set up for SHARKS data
 
 

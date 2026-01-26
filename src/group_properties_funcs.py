@@ -23,7 +23,7 @@ def find_group_sizes(group_ids):
 
 
 @njit(parallel=True)
-def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, is_red, phi_star, M_star, alpha, mag_limit, omega_matter, h):
+def brightest_galaxy_centers(luminosity, abs_mags, ra, dec, z, group_ids, phi_star, M_star, alpha, mag_limit, omega_matter, h):
     """
     Returns the group properties and locations from a list of galaxies and group assignments.
     Centers are placed at the brightest galaxy in each group.
@@ -32,6 +32,8 @@ def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, is_red, phi_star
     ----------
     luminosity : np.array(float)
         Array of uncorrected galaxy luminosities
+    abs_mags : np.array(float)
+        Array of absolute magnitudes of galaxies
     ra : np.array(float)
         Right ascension in degrees of galaxies
     dec : np.array(float)
@@ -79,6 +81,7 @@ def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, is_red, phi_star
     centers_z = np.zeros(n_groups)
     centers_lum = np.zeros(n_groups)
     group_sizes = find_group_sizes(group_ids)
+    bcg_mag = np.zeros(n_groups, dtype=np.int64)
     central_is_red = np.zeros(n_groups, dtype=np.bool_)
     
     for i in prange(n_groups):
@@ -103,6 +106,10 @@ def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, is_red, phi_star
             L_corr = luminosity_correction_factor(mag_limit, Z[0], phi_star, M_star, alpha, omega_matter, h)
             #print(L_corr)
             centers_lum[i] = L[0] * L_corr
+
+            bcg_mag[i] = abs_mags[mask][0]
+
+
             central_is_red[i] = is_red[mask][0]
 
         else:
@@ -122,5 +129,7 @@ def brightest_galaxy_centers(luminosity, ra, dec, z, group_ids, is_red, phi_star
             centers_lum[i] = Lsum * L_corr
             central_is_red[i] = is_red[mask][brightest_idx]
 
+
+            bcg_mag[i] = abs_mags[mask][brightest_idx]
     
-    return unique_groups, centers_ra, centers_dec, centers_z, centers_lum, group_sizes, central_is_red
+    return unique_groups, centers_ra, centers_dec, centers_z, centers_lum, bcg_mag, group_sizes, central_is_red
