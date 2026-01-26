@@ -82,9 +82,7 @@ class HaloFinder:
         self.blue_c_threshold = setup_options['blue_c_threshold']
         self.red_effective_luminosity_boost_a = setup_options['red_effective_luminosity_boost_a']
         self.red_effective_luminosity_boost_b = setup_options['red_effective_luminosity_boost_b']
-        self.blue_effective_luminosity_boost_a = setup_options['blue_effective_luminosity_boost_a']
-        self.blue_effective_luminosity_boost_b = setup_options['blue_effective_luminosity_boost_b']
-        self.b_threshold = setup_options.get('b_threshold', 0.0)
+        #self.b_threshold = setup_options.get('b_threshold', 0.0)
         
         # Get file paths from config
         file_locations = config_reader.get_file_locations()
