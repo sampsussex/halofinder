@@ -82,6 +82,9 @@ class HaloFinder:
         self.blue_c_threshold = setup_options['blue_c_threshold']
         self.red_effective_luminosity_boost_a = setup_options['red_effective_luminosity_boost_a']
         self.red_effective_luminosity_boost_b = setup_options['red_effective_luminosity_boost_b']
+        self.blue_effective_luminosity_boost_a = setup_options['blue_effective_luminosity_boost_a']
+        self.blue_effective_luminosity_boost_b = setup_options['blue_effective_luminosity_boost_b']
+        self.b_threshold = setup_options.get('b_threshold', 0.0)
         
         # Get file paths from config
         file_locations = config_reader.get_file_locations()
@@ -150,7 +153,9 @@ class HaloFinder:
             if 'group_id' in column_names and column_names['group_id'] in data.colnames:
                 self.id_group_sky = np.array(data[column_names['group_id']], dtype='int32')
             else:
-                # If no group ID column, use galaxy ID as fallback
+                run_options = self.config_reader.get_run_options()
+                if run_options.get('run_mock_comparison') or run_options.get('optimse_on_mock'):
+                    raise ValueError("Mock comparison requires a group_id column in the input data.")
                 logging.warning("No group ID column found")
 
 
