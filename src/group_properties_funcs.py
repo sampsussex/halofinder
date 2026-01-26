@@ -23,7 +23,7 @@ def find_group_sizes(group_ids):
 
 
 @njit(parallel=True)
-def brightest_galaxy_centers(luminosity, abs_mags, ra, dec, z, group_ids, phi_star, M_star, alpha, mag_limit, omega_matter, h):
+def brightest_galaxy_centers(luminosity, abs_mags, is_red, ra, dec, z, group_ids, phi_star, M_star, alpha, mag_limit, omega_matter, h):
     """
     Returns the group properties and locations from a list of galaxies and group assignments.
     Centers are placed at the brightest galaxy in each group.
@@ -34,6 +34,8 @@ def brightest_galaxy_centers(luminosity, abs_mags, ra, dec, z, group_ids, phi_st
         Array of uncorrected galaxy luminosities
     abs_mags : np.array(float)
         Array of absolute magnitudes of galaxies
+    is_red : np.array(bool)
+        Numpy array indicating if galaxy is classified as red
     ra : np.array(float)
         Right ascension in degrees of galaxies
     dec : np.array(float)

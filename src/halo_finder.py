@@ -241,7 +241,7 @@ class HaloFinder:
         logging.info("Updating unique group list, luminosity weighted group centres and luminosities...")
         
         #self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes= luminosity_weighted_centers(self.gal_luminosities, self.ra, self.dec, self.zobs, self.group_ids, self.phi_star, self.M_star, self.alpha, self.mag_limit) 
-        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_bcg_abs_mag, self.group_sizes = brightest_galaxy_centers(self.gal_luminosities, self.abs_mag, self.ra, 
+        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_bcg_abs_mag, self.group_sizes = brightest_galaxy_centers(self.gal_luminosities, self.abs_mag, self.is_red, self.ra, 
                                                                                                                                                                       self.dec, self.zobs, self.group_ids, 
                                                                                                                                                                       self.lf_phi_star, self.lf_M_star, self.lf_alpha, 
                                                                                                                                                                       self.mag_limit, self.omega_matter, 
