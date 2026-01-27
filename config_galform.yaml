@@ -4,6 +4,7 @@ run_options:
   run_group_finder: True  # Set to true to run the group finder
   run_mock_comparison: True  # Set to true to compare score to mock
   optimse_on_mock: True # Set to true to optimse the group finder parameters based on mock comparison
+  make_plots: True # Set to false to skip generating plots
   
 
 cosmology:
