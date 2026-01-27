@@ -36,6 +36,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # YangFinder Class
 # ------------------------
 class HaloFinder:
+    _shared_cache = {}
+
     def __init__(self, config_reader):
         """
         Initialize HaloFinder with configuration from ConfigReader.
@@ -51,6 +53,11 @@ class HaloFinder:
         self.iteration_central_assignment = {}
         self.iteration_satellite_assignment = {}
         #self.iteration_central_is_red = {}
+
+        # Get run options from config
+        run_options = config_reader.get_run_options()
+        self.make_plots = run_options.get('make_plots', True)
+        self.use_shared_cache = run_options.get('optimse_on_mock', False)
 
         # Get cosmology options from config
         cosmology = config_reader.get_cosmology()
@@ -119,6 +126,23 @@ class HaloFinder:
         logging.info(f"Save path: {self.save_path}")
         #logginginfo
 
+    def _cache_key(self):
+        return (
+            self.data_load_path,
+            self.hmf_min_mass,
+            self.hmf_max_mass,
+            self.hmf_redshift,
+            self.hmf_dlog10m,
+            self.omega_matter,
+            self.h,
+            self.remove_isolated_galaxies,
+        )
+
+    def _get_cache(self):
+        if not self.use_shared_cache:
+            return None
+        return self._shared_cache.setdefault(self._cache_key(), {})
+
 
     def load_catalogue_data(self):
         """
@@ -126,6 +150,20 @@ class HaloFinder:
         Supports different data formats based on column mappings in config.
         """
         logging.info(f"Loading catalogue data from: {self.data_load_path}")
+
+        cache = self._get_cache()
+        if cache and 'catalogue' in cache:
+            cached = cache['catalogue']
+            self.gal_ids = cached['gal_ids'].copy()
+            self.zobs = cached['zobs'].copy()
+            self.ra = cached['ra'].copy()
+            self.dec = cached['dec'].copy()
+            self.abs_mag = cached['abs_mag'].copy()
+            self.k_corr = cached['k_corr'].copy()
+            self.is_red = cached['is_red'].copy()
+            self.id_group_sky = cached['id_group_sky'].copy()
+            logging.info("Loaded catalogue data from cache.")
+            return
         
         # Load the data
         data = Table.read(self.data_load_path)
@@ -182,45 +220,84 @@ class HaloFinder:
         logging.info(f"Galaxy data extracted: {len(self.gal_ids)} galaxies")
         logging.info(f"Columns loaded: IDs, redshift, RA, Dec, absolute magnitude")
 
+        if cache is not None:
+            cache['catalogue'] = {
+                'gal_ids': self.gal_ids.copy(),
+                'zobs': self.zobs.copy(),
+                'ra': self.ra.copy(),
+                'dec': self.dec.copy(),
+                'abs_mag': self.abs_mag.copy(),
+                'k_corr': self.k_corr.copy(),
+                'is_red': self.is_red.copy(),
+                'id_group_sky': self.id_group_sky.copy(),
+            }
+
 
     def generate_hmf(self):
         logging.info("Generating Halo Mass Function (HMF)...")
+        cache = self._get_cache()
+        if cache and 'hmf' in cache:
+            cached = cache['hmf']
+            self.hmf_masses = cached['hmf_masses'].copy()
+            self.hmf_mass_intervals = cached['hmf_mass_intervals'].copy()
+            logging.info("Loaded HMF from cache.")
+            return
         self.hmf_masses, self.hmf_mass_intervals = generate_hmf(self.hmf_redshift, self.hmf_min_mass, 
                                                                 self.hmf_max_mass, self.hmf_dlog10m, 
                                                                 self.h, self.omega_matter)
         logging.info(f"HMF generated with {len(self.hmf_masses)} mass bins from {self.hmf_masses[0]:.2e} to {self.hmf_masses[-1]:.2e} Msun/h")
+        if cache is not None:
+            cache['hmf'] = {
+                'hmf_masses': self.hmf_masses.copy(),
+                'hmf_mass_intervals': self.hmf_mass_intervals.copy(),
+            }
 
 
     def get_all_comoving_distances(self):
         logging.info("Generating comoving distances for each galaxy...")
+        cache = self._get_cache()
+        if cache and 'comoving_distances' in cache:
+            self.gal_DMs = cache['comoving_distances'].copy()
+            logging.info("Loaded comoving distances from cache.")
+            return
         self.gal_DMs = get_all_comoving_distance(self.zobs, self.omega_matter)
-        plt.hist(self.gal_DMs)
-        plt.title('Galaxy Distance moduli')
-        plt.ylabel('Freq.')
-        plt.xlabel('Comoving Distance, Mpc')
-        plt.savefig('plots/galaxy_distance_moduli')
+        if self.make_plots:
+            plt.hist(self.gal_DMs)
+            plt.title('Galaxy Distance moduli')
+            plt.ylabel('Freq.')
+            plt.xlabel('Comoving Distance, Mpc')
+            plt.savefig(f'{self.plot_save_dir}/galaxy_distance_moduli.png')
+            plt.clf()
         logging.info("Comoving distances generated.")
-        plt.clf()
+        if cache is not None:
+            cache['comoving_distances'] = self.gal_DMs.copy()
 
 
     def create_KDE_tree(self):
         logging.info("Creating KDE of catalouge...")
+        cache = self._get_cache()
+        if cache and 'kde_tree' in cache:
+            self.gal_kde_tree = cache['kde_tree']
+            logging.info("Loaded KDE Tree from cache.")
+            return
         coords = find_all_spherical_to_cartesian(self.ra, self.dec, self.gal_DMs)
         self.gal_kde_tree = KDTree(coords)
         logging.info("KDE Tree successfully created")
+        if cache is not None:
+            cache['kde_tree'] = self.gal_kde_tree
 
 
     def initial_luminosities(self):
         logging.info("Generating initial group luminosities from Z band absolute magnitude...")
         self.gal_luminosities = get_all_magnitude_to_luminosity(self.abs_mag, self.abs_mag_sun)
 
-
-        plt.hist(np.log10(self.gal_luminosities), log=True)
-        plt.title('Initial galaxy luminosities')
-        plt.ylabel('Freq.')
-        plt.xlabel('log10(Luminosity / $10^{14}h^{-1}$)')
-        plt.savefig('plots/initial_galaxy_luminosities')
-        plt.clf()
+        if self.make_plots:
+            plt.hist(np.log10(self.gal_luminosities), log=True)
+            plt.title('Initial galaxy luminosities')
+            plt.ylabel('Freq.')
+            plt.xlabel('log10(Luminosity / $10^{14}h^{-1}$)')
+            plt.savefig(f'{self.plot_save_dir}/initial_galaxy_luminosities.png')
+            plt.clf()
 
         logging.info("Luminosities found.")
 
@@ -263,36 +340,37 @@ class HaloFinder:
 
         self.group_magnitudes = get_all_luminosity_to_magnitude(self.group_luminosities, self.abs_mag_sun)
 
+        if self.make_plots:
+            plt.hist(np.log10(self.group_luminosities*1e14), log=True, bins=25)
+            plt.title('Halo Luminosity Histogram Pre Mass Assignment')
+            plt.savefig(f'{self.plot_save_dir}/halo_luminosities_iter_{self.iteration_counter}_pre_mass_assignment.png')
+            plt.clf()
+            plt.hist(self.group_bcg_k_corrs)
+            plt.title('Group K-corrections')
+            plt.savefig(f'{self.plot_save_dir}/group_k_corrections_iter_{self.iteration_counter}.png')
+            plt.clf()
 
-        plt.hist(np.log10(self.group_luminosities*1e14), log=True, bins=25)
-        plt.title('Halo Luminosity Histogram Pre Mass Assignment')
-        plt.savefig(f'{self.plot_save_dir}/halo_luminosities_iter_{self.iteration_counter}_pre_mass_assignment.png')
-        plt.clf()
-        plt.hist(self.group_bcg_k_corrs)
-        plt.title('Group K-corrections')
-        plt.savefig(f'{self.plot_save_dir}/group_k_corrections_iter_{self.iteration_counter}.png')
-        plt.clf()
+            plt.hist(self.group_magnitudes, log=True, bins = 25)
+            plt.title('Halo Magnitude Histogram Pre Mass Assignment')
+            plt.xlabel('Absolute Magnitude')
+            plt.savefig(f'{self.plot_save_dir}/halo_magnitudes_iter_{self.iteration_counter}_pre_mass_assignment.png')
+            plt.clf()
 
-        plt.hist(self.group_magnitudes, log=True, bins = 25)
-        plt.title('Halo Magnitude Histogram Pre Mass Assignment')
-        plt.xlabel('Absolute Magnitude')
-        plt.savefig(f'{self.plot_save_dir}/halo_magnitudes_iter_{self.iteration_counter}_pre_mass_assignment.png')
-        plt.clf()
-
-        plt.hist(self.group_centres_z)
-        plt.title('Group Redshift Histogram')
-        plt.xlabel('Redshift')
-        plt.savefig(f'{self.plot_save_dir}/group_redshifts_iter_{self.iteration_counter}.png')
-        plt.clf()
+            plt.hist(self.group_centres_z)
+            plt.title('Group Redshift Histogram')
+            plt.xlabel('Redshift')
+            plt.savefig(f'{self.plot_save_dir}/group_redshifts_iter_{self.iteration_counter}.png')
+            plt.clf()
         #logging.info(f"mag limits: {self.mag_limit}, survey fractional area: {self.survey_fractional_area}")
 
 
-        plt.bar(np.log10(self.hmf_masses), self.hmf_mass_intervals, width=0.1)
-        plt.title('Halo Mass Function Intervals')
-        plt.xlabel('log10(Halo Mass / $10^{14}h^{-1}$)')
-        plt.ylabel('dn/dlogM')
-        plt.savefig(f'{self.plot_save_dir}/hmf_intervals_iter_{self.iteration_counter}.png')
-        plt.clf()
+        if self.make_plots:
+            plt.bar(np.log10(self.hmf_masses), self.hmf_mass_intervals, width=0.1)
+            plt.title('Halo Mass Function Intervals')
+            plt.xlabel('log10(Halo Mass / $10^{14}h^{-1}$)')
+            plt.ylabel('dn/dlogM')
+            plt.savefig(f'{self.plot_save_dir}/hmf_intervals_iter_{self.iteration_counter}.png')
+            plt.clf()
 
 
 
@@ -302,10 +380,10 @@ class HaloFinder:
                                                     self.hmf_mass_intervals, self.omega_matter, 
                                                     self.h, self.red_effective_luminosity_boost_a,
                                                     self.red_effective_luminosity_boost_b)
-        plt.hist(np.log10(1e14*self.group_halo_masses), log=True, bins=25)
-
-        plt.savefig(f'{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}_post_mass_assignment.png')
-        plt.clf()
+        if self.make_plots:
+            plt.hist(np.log10(1e14*self.group_halo_masses), log=True, bins=25)
+            plt.savefig(f'{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}_post_mass_assignment.png')
+            plt.clf()
 
         logging.info("Halo masses updated.")
 
@@ -366,6 +444,9 @@ class HaloFinder:
 
 
     def debugging_plots(self):
+        if not self.make_plots:
+            logging.info("Plotting disabled; skipping debugging plots.")
+            return
         logging.info("Creating debugging plots...")
         #Halo masses
         plt.hist(np.log10(self.group_halo_masses * 1e14), log=True, bins=25)
