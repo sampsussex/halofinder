@@ -131,7 +131,7 @@ def test_find_p_M_special_cases():
     h = 0.7
     z_group = 0.2
     z_gal = 0.22
-    M = 1.0
+    M = 10.
     # Coincident group & galaxy → inf
     val_inf = find_p_M(10, 10, 10, 10, z_group, z_group, M, om, h)
     assert np.isinf(val_inf)
