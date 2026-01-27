@@ -57,7 +57,7 @@ class HaloFinder:
         # Get run options from config
         run_options = config_reader.get_run_options()
         self.make_plots = run_options.get('make_plots', True)
-        self.use_shared_cache = run_options.get('optimse_on_mock', False)
+        self.use_shared_cache = run_options.get('optimse_on_mock', False) or run_options.get('optimse_parameter_space', False)
 
         # Get cosmology options from config
         cosmology = config_reader.get_cosmology()
@@ -189,7 +189,7 @@ class HaloFinder:
                 self.id_group_sky = np.array(data[column_names['group_id']], dtype='int32')
             else:
                 run_options = self.config_reader.get_run_options()
-                if run_options.get('run_mock_comparison') or run_options.get('optimse_on_mock'):
+                if run_options.get('run_mock_comparison') or run_options.get('optimse_on_mock') or run_options.get('optimse_parameter_space'):
                     raise ValueError("Mock comparison requires a group_id column in the input data.")
                 logging.warning("No group ID column found")
 
@@ -535,5 +535,4 @@ class TinkerFinder(HaloFinder):
         self.iterate_tinker_finder()
         self.s_score()
         logging.info("Tinker Finder run complete.")
-
 
