@@ -46,6 +46,12 @@ def optimize_on_mock(config_reader):
         tinker_finder.blue_b_threshold = blue_b
         tinker_finder.red_effective_luminosity_boost_a = red_boost_a
         tinker_finder.red_effective_luminosity_boost_b = red_boost_b
+        print(
+            "Optimising params: "
+            f"red_a={red_a:.4f}, red_b={red_b:.4f}, "
+            f"blue_a={blue_a:.4f}, blue_b={blue_b:.4f}, "
+            f"red_boost_a={red_boost_a:.4f}, red_boost_b={red_boost_b:.4f}"
+        )
         tinker_finder.run()
         return -tinker_finder.s_tot
 
