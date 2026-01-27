@@ -29,8 +29,8 @@ def optimize_on_mock(config_reader):
         (10.0, 30.0),   # red_b_threshold
         (-10.0, 0.0),   # blue_a_threshold
         (10.0, 30.0),   # blue_b_threshold
-        (-2.0, 2.0),   # red_effective_luminosity_boost_a
-        (-2.0, 2.0),   # red_effective_luminosity_boost_b
+        (0.0, 2.0),   # red_effective_luminosity_boost_a
+        (-1.0, 2.0),   # red_effective_luminosity_boost_b
     ]
 
     def objective_function(params):
@@ -61,14 +61,14 @@ def optimize_on_mock(config_reader):
     return minimize(objective_function, initial_params, bounds=bounds, method="L-BFGS-B")
 
 
-def grid_search_on_mock(config_reader, num_points=100):
+def grid_search_on_mock(config_reader, num_points=500):
     bounds = [
         (-10.0, 0.0),   # red_a_threshold
         (10.0, 30.0),   # red_b_threshold
         (-10.0, 0.0),   # blue_a_threshold
         (10.0, 30.0),   # blue_b_threshold
-        (-2.0, 2.0),   # red_effective_luminosity_boost_a
-        (-2.0, 2.0),   # red_effective_luminosity_boost_b
+        (0.0, 2.0),   # red_effective_luminosity_boost_a
+        (-1.0, 2.0),   # red_effective_luminosity_boost_b
     ]
     param_names = [
         "red_a_threshold",
