@@ -37,10 +37,8 @@ file_locations:
 setup_options:
   red_a_threshold: 1 # Probability threshold for the group finder
   red_b_threshold: 0.5
-  red_c_threshold: 10
   blue_a_threshold: 0.5
   blue_b_threshold: 0.25
-  blue_c_threshold: 8
   red_effective_luminosity_boost_a: 0.9  # Effective luminosity boost parameters for red galaxies
   red_effective_luminosity_boost_b: 0.1
   blue_effective_luminosity_boost_a: 0.9  # Effective luminosity boost parameters for blue galaxies
