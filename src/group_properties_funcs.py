@@ -83,7 +83,7 @@ def brightest_galaxy_centers(luminosity, abs_mags, is_red, ra, dec, z, group_ids
     centers_z = np.zeros(n_groups)
     centers_lum = np.zeros(n_groups)
     group_sizes = find_group_sizes(group_ids)
-    bcg_mag = np.zeros(n_groups, dtype=np.int64)
+    bcg_mag = np.zeros(n_groups)
     central_is_red = np.zeros(n_groups, dtype=np.bool_)
     
     for i in prange(n_groups):
@@ -135,3 +135,127 @@ def brightest_galaxy_centers(luminosity, abs_mags, is_red, ra, dec, z, group_ids
             bcg_mag[i] = abs_mags[mask][brightest_idx]
     
     return unique_groups, centers_ra, centers_dec, centers_z, centers_lum, bcg_mag, group_sizes, central_is_red
+
+
+@njit(cache=True)
+def sort_and_build_segments(group_ids):
+    """
+    Returns:
+      order        : indices that sort group_ids
+      gid_sorted   : group_ids[order]
+      unique_gids  : unique group id per segment (length n_groups)
+      starts       : start index (in sorted arrays) per group
+      ends         : end index (exclusive, in sorted arrays) per group
+    """
+    n = group_ids.size
+    order = np.argsort(group_ids)                 # JIT-supported
+    gid_sorted = group_ids[order]
+
+    # Edge case: empty input
+    if n == 0:
+        return order, gid_sorted, np.empty(0, np.int64), np.empty(0, np.int64), np.empty(0, np.int64)
+
+    # Pass 1: count groups (= number of runs)
+    n_groups = 1
+    prev = gid_sorted[0]
+    for i in range(1, n):
+        g = gid_sorted[i]
+        if g != prev:
+            n_groups += 1
+            prev = g
+
+    # Allocate segment arrays
+    starts = np.empty(n_groups, np.int64)
+    ends = np.empty(n_groups, np.int64)
+    unique_gids = np.empty(n_groups, np.int64)
+
+    # Pass 2: fill segments
+    gi = 0
+    starts[gi] = 0
+    unique_gids[gi] = gid_sorted[0]
+    prev = gid_sorted[0]
+
+    for i in range(1, n):
+        g = gid_sorted[i]
+        if g != prev:
+            ends[gi] = i
+            gi += 1
+            starts[gi] = i
+            unique_gids[gi] = g
+            prev = g
+
+    ends[gi] = n
+    return order, gid_sorted, unique_gids, starts, ends
+
+
+# ------------------------------------------------------------
+# 2) JIT: compute BCG-centred group properties from segments
+# ------------------------------------------------------------
+@njit(parallel=True)
+def brightest_galaxy_centers_from_segments(
+    order, unique_gids, starts, ends,
+    luminosity, abs_mags, is_red, ra, dec, z,
+    phi_star, M_star, alpha, mag_limit, omega_matter, h
+):
+    """
+    Same outputs as your original function, but uses (order, starts, ends)
+    so each group is a contiguous slice in the sorted index space.
+    """
+    n_groups = unique_gids.size
+
+    centers_ra = np.empty(n_groups, np.float64)
+    centers_dec = np.empty(n_groups, np.float64)
+    centers_z = np.empty(n_groups, np.float64)
+    centers_lum = np.empty(n_groups, np.float64)
+    bcg_mag = np.empty(n_groups, np.float64)
+    central_is_red = np.empty(n_groups, np.bool_)
+    group_sizes = np.empty(n_groups, np.int64)
+
+    for i in prange(n_groups):
+        s = starts[i]
+        e = ends[i]
+        group_sizes[i] = e - s
+
+        # One pass: sum L + find brightest (track original index best_j)
+        Lsum = 0.0
+        best_L = -1.0e300
+        best_j = -1
+
+        for k in range(s, e):
+            j = order[k]               # original galaxy index
+            Lj = luminosity[j]
+            Lsum += Lj
+            if Lj > best_L:
+                best_L = Lj
+                best_j = j
+
+        # Center at brightest galaxy
+        cz = z[best_j]
+        centers_ra[i] = ra[best_j]
+        centers_dec[i] = dec[best_j]
+        centers_z[i] = cz
+        bcg_mag[i] = abs_mags[best_j]
+        central_is_red[i] = is_red[best_j]
+
+        # Luminosity correction evaluated at BCG z (as in your original)
+        L_corr = luminosity_correction_factor(
+            mag_limit, cz, phi_star, M_star, alpha, omega_matter, h
+        )
+        centers_lum[i] = Lsum * L_corr
+
+    return unique_gids, centers_ra, centers_dec, centers_z, centers_lum, bcg_mag, group_sizes, central_is_red
+
+@njit
+def brightest_galaxy_centers_fast(
+    luminosity, abs_mags, is_red, ra, dec, z, group_ids,
+    phi_star, M_star, alpha, mag_limit, omega_matter, h
+):
+    # (Recommended) ensure contiguous dtypes once outside the JIT hot path
+
+    order, gid_sorted, unique_gids, starts, ends = sort_and_build_segments(group_ids)
+
+    return brightest_galaxy_centers_from_segments(
+        order, unique_gids, starts, ends,
+        luminosity, abs_mags, is_red, ra, dec, z,
+        phi_star, M_star, alpha, mag_limit, omega_matter, h
+    )

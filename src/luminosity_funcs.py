@@ -281,7 +281,7 @@ def generate_empircal_lf(group_abs_mags, group_zs,  bcg_abs_mags, bcg_k_corrs, s
 
     #v_vmaxs = vs / vmaxs
 
-    bins = np.linspace(abs_mag_min, abs_mag_max, 100)
+    bins = np.linspace(abs_mag_min, abs_mag_max, 50)
 
     phi = histogram_numba(group_abs_mags, bins=bins, weights= 1.0 / vmaxs)
     return phi, bins
@@ -479,6 +479,7 @@ def update_halo_masses(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, bcg_is_red, surv
 
 @njit
 def k_corr(zs):
+    # K-correction from Robotham+11
     z_ref = 0
     Q_z_ref = 1.75
     z_p = 0.2

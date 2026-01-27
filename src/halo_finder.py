@@ -5,7 +5,7 @@ from numba_kdtree import KDTree
 import logging
 import matplotlib.pyplot as plt
 from cosmo_funcs import get_all_comoving_distance, find_all_spherical_to_cartesian, get_all_magnitude_to_luminosity, get_all_luminosity_to_magnitude
-from group_properties_funcs import find_all_initial_mass_to_light, brightest_galaxy_centers
+from group_properties_funcs import find_all_initial_mass_to_light, brightest_galaxy_centers, brightest_galaxy_centers_fast
 from luminosity_funcs import update_halo_masses, k_corr, generate_hmf
 from group_finding_funcs import update_group_membership_tinker
 from utils import ConfigReader
@@ -13,25 +13,18 @@ from bijective_matching import s_score
 
 #
 # To do list - For MVP
-# K corrections on group luminosities will be a nightmare but needs to be done
 # 5logh needs to be in magnitudes, which are all in absolute mags
 # Take in k corrections from input gal catalog.
+# //TODO add plotting trigger in config
+# //TODO implement cached catalog/comoving/hmf/kde tree loading when optimising on mock
+# //TODO fix high mass end of hmf 
 
-# Score to beat: S_tot = 0.3601092310748732
-#
+
 # For paper
 # Implement completeness correction
 # Implement correction for survey edges (could this be related to above?)
 # Think of novel way of adding photo-zs
-# Red vs blue?
 
-# Tidy ups; 
-
-# 2) sort issues when group queries member galaxy
-# 3) check that there are no halos without a central galaxy
-# 4) Probably need to relook at logic on groupfindering to see if there are simpliciations
-# 5) Flagging changes could be updating group properties a lot quicker. (Halo Mass probs not though)
-# 7) rejig lf function. 
 
 # ------------------------
 # Set up logging
@@ -231,6 +224,12 @@ class HaloFinder:
 
         logging.info("Luminosities found.")
 
+    
+    def initial_mass_assignment(self):
+        logging.info("Generating initial halo masses from mass-to-light ratio...")
+        self.group_halo_masses = find_all_initial_mass_to_light(self.group_luminosities, 500.0)
+        logging.info("Initial halo masses assigned.")
+
 
     def initial_group_central_satellite_assignment(self):
         """
@@ -250,7 +249,7 @@ class HaloFinder:
         logging.info("Updating unique group list, luminosity weighted group centres and luminosities...")
         
         #self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes= luminosity_weighted_centers(self.gal_luminosities, self.ra, self.dec, self.zobs, self.group_ids, self.phi_star, self.M_star, self.alpha, self.mag_limit) 
-        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_bcg_abs_mag, self.group_sizes, self.group_bcg_is_red = brightest_galaxy_centers(self.gal_luminosities, self.abs_mag, self.is_red, self.ra, 
+        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_bcg_abs_mag, self.group_sizes, self.group_bcg_is_red = brightest_galaxy_centers_fast(self.gal_luminosities, self.abs_mag, self.is_red, self.ra, 
                                                                                                                                                                       self.dec, self.zobs, self.group_ids, 
                                                                                                                                                                       self.lf_phi_star, self.lf_M_star, self.lf_alpha, 
                                                                                                                                                                       self.mag_limit, self.omega_matter, 
@@ -285,7 +284,7 @@ class HaloFinder:
         plt.xlabel('Redshift')
         plt.savefig(f'{self.plot_save_dir}/group_redshifts_iter_{self.iteration_counter}.png')
         plt.clf()
-        logging.info(f"mag limits: {self.mag_limit}, survey fractional area: {self.survey_fractional_area}")
+        #logging.info(f"mag limits: {self.mag_limit}, survey fractional area: {self.survey_fractional_area}")
 
 
         plt.bar(np.log10(self.hmf_masses), self.hmf_mass_intervals, width=0.1)
@@ -446,15 +445,14 @@ class TinkerFinder(HaloFinder):
         self.s_score()
         logging.info("Tinker Finder run complete.")
 
+    def run_cached_cat_hmf_comoving_KDE(self):
+        logging.info("Running the Tinker Finder with cached catalogue, HMF, comoving distances and KDE...")
+        self.initial_group_central_satellite_assignment()
+        self.initial_luminosities()
+        self.update_group_luminosity_and_centres()
+        self.update_group_halo_masses()
+        self.iterate_tinker_finder()
+        self.s_score()
+        logging.info("Tinker Finder run complete.")
 
-#if __name__ == "__main__":
-#    # Load configuration
-#    config_reader = ConfigReader("config_galform.yaml")
-#    config_reader.load_config()
-#    #config_reader.validate_config()
-#    # Create and run TinkerFinder
-#    
-#    finder = TinkerFinder(config_reader)
-#    finder.run()
-    
-#    logging.info("Finder run complete")
+
