@@ -15,10 +15,8 @@ def optimize_on_mock(config_reader):
     initial_params = [
         setup_options['red_a_threshold'],
         setup_options['red_b_threshold'],
-        setup_options['red_c_threshold'],
         setup_options['blue_a_threshold'],
         setup_options['blue_b_threshold'],
-        setup_options['blue_c_threshold'],
         setup_options['red_effective_luminosity_boost_a'],
         setup_options['red_effective_luminosity_boost_b'],
     ]
@@ -26,10 +24,8 @@ def optimize_on_mock(config_reader):
     bounds = [
         (0.0, 5.0),   # red_a_threshold
         (0.0, 5.0),   # red_b_threshold
-        (0.0, 20.0),  # red_c_threshold
         (0.0, 5.0),   # blue_a_threshold
         (0.0, 5.0),   # blue_b_threshold
-        (0.0, 20.0),  # blue_c_threshold
         (0.0, 2.0),   # red_effective_luminosity_boost_a
         (0.0, 2.0),   # red_effective_luminosity_boost_b
     ]
@@ -38,20 +34,16 @@ def optimize_on_mock(config_reader):
         (
             red_a,
             red_b,
-            red_c,
             blue_a,
             blue_b,
-            blue_c,
             red_boost_a,
             red_boost_b,
         ) = params
         tinker_finder = TinkerFinder(config_reader)
         tinker_finder.red_a_threshold = red_a
         tinker_finder.red_b_threshold = red_b
-        tinker_finder.red_c_threshold = red_c
         tinker_finder.blue_a_threshold = blue_a
         tinker_finder.blue_b_threshold = blue_b
-        tinker_finder.blue_c_threshold = blue_c
         tinker_finder.red_effective_luminosity_boost_a = red_boost_a
         tinker_finder.red_effective_luminosity_boost_b = red_boost_b
         tinker_finder.run()

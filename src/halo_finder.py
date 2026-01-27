@@ -76,10 +76,8 @@ class HaloFinder:
         self.remove_isolated_galaxies = setup_options['remove_isolated_galaxies']
         self.red_a_threshold = setup_options['red_a_threshold']
         self.red_b_threshold = setup_options['red_b_threshold']
-        self.red_c_threshold = setup_options['red_c_threshold']
         self.blue_a_threshold = setup_options['blue_a_threshold']
         self.blue_b_threshold = setup_options['blue_b_threshold']
-        self.blue_c_threshold = setup_options['blue_c_threshold']
         self.red_effective_luminosity_boost_a = setup_options['red_effective_luminosity_boost_a']
         self.red_effective_luminosity_boost_b = setup_options['red_effective_luminosity_boost_b']
         #self.b_threshold = setup_options.get('b_threshold', 0.0)
@@ -244,7 +242,7 @@ class HaloFinder:
         logging.info("Updating unique group list, luminosity weighted group centres and luminosities...")
         
         #self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes= luminosity_weighted_centers(self.gal_luminosities, self.ra, self.dec, self.zobs, self.group_ids, self.phi_star, self.M_star, self.alpha, self.mag_limit) 
-        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_bcg_abs_mag, self.group_sizes = brightest_galaxy_centers(self.gal_luminosities, self.abs_mag, self.is_red, self.ra, 
+        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_bcg_abs_mag, self.group_sizes, self.group_bcg_is_red = brightest_galaxy_centers(self.gal_luminosities, self.abs_mag, self.is_red, self.ra, 
                                                                                                                                                                       self.dec, self.zobs, self.group_ids, 
                                                                                                                                                                       self.lf_phi_star, self.lf_M_star, self.lf_alpha, 
                                                                                                                                                                       self.mag_limit, self.omega_matter, 
@@ -292,10 +290,11 @@ class HaloFinder:
 
 
         self.group_halo_masses = update_halo_masses(self.group_magnitudes, self.group_centres_z,
-                                                    self.group_bcg_abs_mag, self.group_bcg_k_corrs, self.mag_limit, 
-                                                    self.survey_fractional_area, self.hmf_masses, 
+                                                    self.group_bcg_abs_mag, self.group_bcg_k_corrs, self.group_bcg_is_red,
+                                                    self.mag_limit, self.survey_fractional_area, self.hmf_masses, 
                                                     self.hmf_mass_intervals, self.omega_matter, 
-                                                    self.h)
+                                                    self.h, self.red_effective_luminosity_boost_a,
+                                                    self.red_effective_luminosity_boost_b)
         plt.hist(np.log10(1e14*self.group_halo_masses), log=True, bins=25)
 
         plt.savefig(f'{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}_post_mass_assignment.png')
@@ -309,8 +308,8 @@ class HaloFinder:
             self.ra, self.dec, self.zobs, self.group_ids,
             self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, 
             self.group_sizes, self.group_halo_masses, self.gal_kde_tree, self.gal_is_central, self.gal_is_satellite, 
-            self.is_red, self.red_a_threshold, self.red_b_threshold, self.red_c_threshold, self.blue_a_threshold, 
-            self.blue_b_threshold, self.blue_c_threshold, self.omega_matter, self.h)
+            self.is_red, self.red_a_threshold, self.red_b_threshold, self.blue_a_threshold, 
+            self.blue_b_threshold, self.omega_matter, self.h)
         logging.info(f"Groupfinder iteration complete, number of groups found: {len(np.unique(self.new_members))}")
 
 
