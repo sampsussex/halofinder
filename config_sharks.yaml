@@ -1,34 +1,34 @@
 
 
 run_options:  
-  run_group_finder: True  # Set to true to run the group finder
+  run_group_finder: False  # Set to true to run the group finder
   run_mock_comparison: True  # Set to true to compare score to mock
-  optimse_on_mock: True # Set to true to optimse the group finder parameters based on mock comparison
+  optimse_on_mock: False # Set to true to optimse the group finder parameters based on mock comparison
   
 
 cosmology:
-  h: 0.704 # Little h value
-  omega_matter: 0.27 # Omega matter value- Flat cosmology assumed so Omega_Lambda = 1 - Omega_matter
+  h: 0.6751 # Little h value
+  omega_matter: 0.3 # Omega matter value- Flat cosmology assumed so Omega_Lambda = 1 - Omega_matter
 
 
-survey_fractional_sky_area: 0.0035 # 
+survey_fractional_sky_area: 0.0012 # 
 
 
 column_names:
-  galaxy_id: "GalID"  # For SHARKS data
-  ra: "RA"
-  dec: "DEC"
-  redshift: "Zspec"
-  absolute_magnitude: "Rpetro_abs"
-  apparent_magnitude: "Rpetro"
+  galaxy_id: "id_galaxy_sky"  # For SHARKS data
+  ra: "ra"
+  dec: "dec"
+  redshift: "zobs"
+  absolute_magnitude: "total_ab_dust_Z_VISTA"
+  apparent_magnitude: "total_ap_dust_Z_VISTA"
   k_correction: "k-e corr"
-  group_id: "HaloID"
+  group_id: "id_fof"
   galaxy_is_red: "is_red"
 
 
 file_locations:
-  galaxy_catalog_path: '/Users/sp624AA/Downloads/mocks/GALFORM/G3CMockGalv04all_z_r_1965_processed.parquet' # Specify the loading path for the catalogue
-  luminosity_function_path: "luminosity_function/schechter_fit_galform.dat" # Save location for the luminosity function dat file
+  galaxy_catalog_path: '/Users/sp624AA/Downloads/mocks/v0.4.0/cut_waves_deep_gals.parquet' # Specify the loading path for the catalogue
+  #luminosity_function_path: "luminosity_function/schechter_fit_galform.dat" # Save location for the luminosity function dat file
   galaxy_group_path: "gal_groups_sharks.dat"        # Save location for the galaxy group dat file
   s_tot_path: "s_tot_sharks.dat"            # Save location for the S_tot dat file
   plots_dir: "plots/"           # Directory to save the plots
@@ -41,10 +41,10 @@ setup_options:
   blue_a_threshold: 0.5
   blue_b_threshold: 0.25
   blue_c_threshold: 8
-  red_effective_luminosity_boost_a: 0.9  # Effective luminosity boost parameters for red galaxies
-  red_effective_luminosity_boost_b: 0.1
-  survey_magnitude_limit: 19.65  # Magnitude limit for the survey
-  abs_solar_magnitude_in_band: 4.64  # Absolute solar magnitude
+  red_effective_luminosity_boost_a: 0.5  # Effective luminosity boost parameters for red galaxies
+  red_effective_luminosity_boost_b: 0.5
+  survey_magnitude_limit: 21.25  # Magnitude limit for the survey
+  abs_solar_magnitude_in_band: 4.51  # Absolute solar magnitude
   max_iterations: 8  # Maximum number of iterations for the group finder
   remove_isolated_galaxies: False  # Set to true to remove isolated galaxies - only set up for SHARKS data
 
@@ -52,14 +52,14 @@ setup_options:
 hmf_options:
   hmf_min_mass: 10  # Minimum mass for the HMF in log10(Msun)
   hmf_max_mass: 16  # Maximum mass for the HMF in log10(Msun)
-  hmf_redshift: 0.2  # Redshift for the HMF calculation
+  hmf_redshift: 0.4  # Redshift for the HMF calculation
   hmf_dlog10m: 0.01  # Logarithmic bin width for the HMF
 
 
 luminosity_function_options: # Schechter function parameters fit to data.
-  phi_star: 2.957829e-03
-  M_star: -2.227013e+01
-  alpha: -1.109065e+00
+  phi_star: 8.717241206267565667e-04
+  M_star: -23.72
+  alpha: -1.39
 
 
 mock_comparison_options:
