@@ -2,9 +2,9 @@
 
 run_options:  
   run_group_finder: False  # Set to true to run the group finder
-  run_mock_comparison: True  # Set to true to compare score to mock
-  optimse_on_mock: False # Set to true to optimse the group finder parameters based on mock comparison
-  make_plots: True # Set to false to skip generating plots
+  run_mock_comparison: False  # Set to true to compare score to mock
+  optimse_on_mock: True # Set to true to optimse the group finder parameters based on mock comparison
+  make_plots: False # Set to false to skip generating plots
   
 
 cosmology:
@@ -44,7 +44,7 @@ setup_options:
   red_effective_luminosity_boost_b: 0.
   survey_magnitude_limit: 21.25  # Magnitude limit for the survey
   abs_solar_magnitude_in_band: 4.51  # Absolute solar magnitude
-  max_iterations: 8  # Maximum number of iterations for the group finder
+  max_iterations: 1  # Maximum number of iterations for the group finder
   remove_isolated_galaxies: False  # Set to true to remove isolated galaxies - only set up for SHARKS data
 
 

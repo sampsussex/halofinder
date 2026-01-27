@@ -17,7 +17,7 @@ def straight_line_func(x, slope, intercept, pivot = 13.):
 
 
 @njit(float64[:](int64[:], int64, float64[:], float64[:], float64[:], 
-                 float64, float64, float64, float64, float64, float64), parallel=True, cache=True)
+                 float64, float64, float64, float64, float64, float64), parallel=True)
 def compute_probabilities_parallel(
     indices, central_idx, galaxy_ra, galaxy_dec, galaxy_z,
     group_ra_i, group_dec_i, group_z_i, group_halo_mass_i, omega_matter, h
