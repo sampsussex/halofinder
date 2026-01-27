@@ -9,6 +9,7 @@ def negative_exponential_func(x, B_a, B_b, B_c):
     """ A helper function to compute negative exponential values."""
     return B_a * np.exp(-B_b * x) + B_c
 
+@njit
 def straight_line_func(x, slope, intercept, pivot = 13.):
     """ A helper function to compute straight line values.
     Pivot is at Mh = 10**13 h^-1 M_sun by default."""

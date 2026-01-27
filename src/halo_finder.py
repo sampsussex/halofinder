@@ -86,7 +86,7 @@ class HaloFinder:
         file_locations = config_reader.get_file_locations()
         self.data_load_path = file_locations['galaxy_catalog_path']
         self.save_path = file_locations['galaxy_group_path']
-        self.lf_param_load_path = file_locations['luminosity_function_path']
+        #self.lf_param_load_path = file_locations['luminosity_function_path']
         self.plot_save_dir = file_locations['plots_dir']
         self.s_tot_save_path = file_locations['s_tot_path']
 
@@ -115,8 +115,16 @@ class HaloFinder:
         logging.info(f"Max iterations set to {self.max_iterations}")
         logging.info(f"Magnitude limit set to {self.mag_limit}")
         logging.info(f"Data load path: {self.data_load_path}")
-        logging.info(f"B parameter threshold: {self.b_threshold}")
+
+        # log all thresholds
+        logging.info(f"Red a threshold: {self.red_a_threshold}")
+        logging.info(f"Red b threshold: {self.red_b_threshold}")
+        logging.info(f"Blue a threshold: {self.blue_a_threshold}")
+        logging.info(f"Blue b threshold: {self.blue_b_threshold}")
+        
+        #logging.info(f"B parameter threshold: {self.b_threshold}")
         logging.info(f"Save path: {self.save_path}")
+        #logginginfo
 
 
     def load_catalogue_data(self):
@@ -355,7 +363,7 @@ class HaloFinder:
 
         self.s_tot = score
         # Save the S-score to a file
-        np.savetxt(self.s_tot_save_path + '_B:' + str(self.b_threshold), [score], header='S-score', fmt='%.6f')
+        np.savetxt(self.s_tot_save_path + '_B:', [score], header='S-score', fmt='%.6f')
 
 
     def debugging_plots(self):
