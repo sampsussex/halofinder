@@ -6,7 +6,7 @@ import logging
 import matplotlib.pyplot as plt
 from cosmo_funcs import get_all_comoving_distance, find_all_spherical_to_cartesian, get_all_magnitude_to_luminosity, get_all_luminosity_to_magnitude
 from group_properties_funcs import find_all_initial_mass_to_light, brightest_galaxy_centers, brightest_galaxy_centers_fast
-from luminosity_funcs import update_halo_masses, k_corr, generate_hmf
+from luminosity_funcs import k_corr, generate_hmf
 from group_finding_funcs import update_group_membership_tinker
 from utils import ConfigReader
 from bijective_matching import s_score
@@ -76,10 +76,14 @@ class HaloFinder:
         self.remove_isolated_galaxies = setup_options['remove_isolated_galaxies']
         self.red_a_threshold = setup_options['red_a_threshold']
         self.red_b_threshold = setup_options['red_b_threshold']
+        self.red_c_threshold = setup_options['red_c_threshold']
         self.blue_a_threshold = setup_options['blue_a_threshold']
         self.blue_b_threshold = setup_options['blue_b_threshold']
-        self.red_effective_luminosity_boost_a = setup_options['red_effective_luminosity_boost_a']
-        self.red_effective_luminosity_boost_b = setup_options['red_effective_luminosity_boost_b']
+        self.blue_c_threshold = setup_options['blue_c_threshold']
+        self.threshold_b_pivot = setup_options['threshold_b_pivot']
+        self.threshold_c_pivot = setup_options['threshold_c_pivot']
+        self.shmr_slope = setup_options['shmr_slope']
+        self.shmr_intercept = setup_options['shmr_intercept']
         #self.b_threshold = setup_options.get('b_threshold', 0.0)
         
         # Get file paths from config
@@ -120,7 +124,9 @@ class HaloFinder:
         logging.info(f"Red a threshold: {self.red_a_threshold}")
         logging.info(f"Red b threshold: {self.red_b_threshold}")
         logging.info(f"Blue a threshold: {self.blue_a_threshold}")
+        logging.info(f"Red c threshold: {self.red_c_threshold}")
         logging.info(f"Blue b threshold: {self.blue_b_threshold}")
+        logging.info(f"Blue c threshold: {self.blue_c_threshold}")
         
         #logging.info(f"B parameter threshold: {self.b_threshold}")
         logging.info(f"Save path: {self.save_path}")
@@ -161,6 +167,7 @@ class HaloFinder:
             self.abs_mag = cached['abs_mag'].copy()
             self.k_corr = cached['k_corr'].copy()
             self.is_red = cached['is_red'].copy()
+            self.stellar_mass = cached['stellar_mass'].copy()
             self.id_group_sky = cached['id_group_sky'].copy()
             logging.info("Loaded catalogue data from cache.")
             return
@@ -182,6 +189,7 @@ class HaloFinder:
             self.abs_mag = np.array(data[column_names['absolute_magnitude']], dtype='float64')
             self.k_corr = np.array(data[column_names['k_correction']], dtype='float64')
             self.is_red = np.array(data[column_names['galaxy_is_red']], dtype=bool)
+            self.stellar_mass = np.array(data[column_names['stellar_mass']], dtype='float64')
 
             
             # Handle group ID - might be same as galaxy ID for some datasets
@@ -205,6 +213,7 @@ class HaloFinder:
                 self.id_group_sky = self.id_group_sky[mask]
                 self.k_corr = self.k_corr[mask]
                 self.is_red = self.is_red[mask]
+                self.stellar_mass = self.stellar_mass[mask]
                 logging.info(f"Isolated galaxies removed. Remaining galaxies: {len(self.gal_ids)}")
             
                 
@@ -229,6 +238,7 @@ class HaloFinder:
                 'abs_mag': self.abs_mag.copy(),
                 'k_corr': self.k_corr.copy(),
                 'is_red': self.is_red.copy(),
+                'stellar_mass': self.stellar_mass.copy(),
                 'id_group_sky': self.id_group_sky.copy(),
             }
 
@@ -326,11 +336,11 @@ class HaloFinder:
         logging.info("Updating unique group list, luminosity weighted group centres and luminosities...")
         
         #self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_sizes= luminosity_weighted_centers(self.gal_luminosities, self.ra, self.dec, self.zobs, self.group_ids, self.phi_star, self.M_star, self.alpha, self.mag_limit) 
-        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_bcg_abs_mag, self.group_sizes, self.group_bcg_is_red = brightest_galaxy_centers_fast(self.gal_luminosities, self.abs_mag, self.is_red, self.ra, 
-                                                                                                                                                                      self.dec, self.zobs, self.group_ids, 
-                                                                                                                                                                      self.lf_phi_star, self.lf_M_star, self.lf_alpha, 
-                                                                                                                                                                      self.mag_limit, self.omega_matter, 
-                                                                                                                                                                      self.h) 
+        self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, self.group_luminosities, self.group_stellar_masses, self.group_bcg_abs_mag, self.group_sizes, self.group_bcg_is_red = brightest_galaxy_centers_fast(
+            self.gal_luminosities, self.stellar_mass, self.abs_mag, self.is_red, self.ra,
+            self.dec, self.zobs, self.group_ids, self.lf_phi_star, self.lf_M_star, self.lf_alpha,
+            self.mag_limit, self.omega_matter, self.h
+        )
         logging.info('Lists updated successfully')
 
     def update_group_halo_masses(self):
@@ -374,12 +384,9 @@ class HaloFinder:
 
 
 
-        self.group_halo_masses = update_halo_masses(self.group_magnitudes, self.group_centres_z,
-                                                    self.group_bcg_abs_mag, self.group_bcg_k_corrs, self.group_bcg_is_red,
-                                                    self.mag_limit, self.survey_fractional_area, self.hmf_masses, 
-                                                    self.hmf_mass_intervals, self.omega_matter, 
-                                                    self.h, self.red_effective_luminosity_boost_a,
-                                                    self.red_effective_luminosity_boost_b)
+        self.group_halo_masses = 10 ** (
+            self.shmr_slope * np.log10(self.group_stellar_masses) + self.shmr_intercept
+        ) / 1e14
         if self.make_plots:
             plt.hist(np.log10(1e14*self.group_halo_masses), log=True, bins=25)
             plt.savefig(f'{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}_post_mass_assignment.png')
@@ -393,8 +400,8 @@ class HaloFinder:
             self.ra, self.dec, self.zobs, self.group_ids,
             self.unique_groups, self.group_centres_ra, self.group_centres_dec, self.group_centres_z, 
             self.group_sizes, self.group_halo_masses, self.gal_kde_tree, self.gal_is_central, self.gal_is_satellite, 
-            self.is_red, self.red_a_threshold, self.red_b_threshold, self.blue_a_threshold, 
-            self.blue_b_threshold, self.omega_matter, self.h)
+            self.is_red, self.stellar_mass, self.red_a_threshold, self.red_b_threshold, self.red_c_threshold, self.blue_a_threshold, 
+            self.blue_b_threshold, self.blue_c_threshold, self.threshold_b_pivot, self.threshold_c_pivot, self.omega_matter, self.h)
         logging.info(f"Groupfinder iteration complete, number of groups found: {len(np.unique(self.new_members))}")
 
 
@@ -483,6 +490,14 @@ class HaloFinder:
 
 
         # Halo L vs M
+
+        plt.scatter(np.log10(self.group_stellar_masses), np.log10(self.group_halo_masses * 1e14), s=0.1)
+        plt.title('Group stellar mass vs halo mass')
+        plt.xlabel('log10(Group stellar mass)')
+        plt.ylabel('log10(Halo Mass / $h^{-1}$)')
+        plt.savefig(f'{self.plot_save_dir}/halo_m_vs_stellar_m_iter_{self.iteration_counter}.png')
+        plt.clf()
+
         plt.scatter(np.log10(self.group_halo_masses*1e14), np.log10(self.group_luminosities*1e14), s=0.1)
         plt.title("Halo mass vs Luminosity")
         plt.xlabel('log10(Halo Mass / h^{-1}$)')

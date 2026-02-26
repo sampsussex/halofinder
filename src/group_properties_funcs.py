@@ -194,7 +194,7 @@ def sort_and_build_segments(group_ids):
 @njit(parallel=True)
 def brightest_galaxy_centers_from_segments(
     order, unique_gids, starts, ends,
-    luminosity, abs_mags, is_red, ra, dec, z,
+    luminosity, stellar_mass, abs_mags, is_red, ra, dec, z,
     phi_star, M_star, alpha, mag_limit, omega_matter, h
 ):
     """
@@ -207,6 +207,7 @@ def brightest_galaxy_centers_from_segments(
     centers_dec = np.empty(n_groups, np.float64)
     centers_z = np.empty(n_groups, np.float64)
     centers_lum = np.empty(n_groups, np.float64)
+    group_stellar_mass = np.empty(n_groups, np.float64)
     bcg_mag = np.empty(n_groups, np.float64)
     central_is_red = np.empty(n_groups, np.bool_)
     group_sizes = np.empty(n_groups, np.int64)
@@ -218,6 +219,7 @@ def brightest_galaxy_centers_from_segments(
 
         # One pass: sum L + find brightest (track original index best_j)
         Lsum = 0.0
+        stellar_mass_sum = 0.0
         best_L = -1.0e300
         best_j = -1
 
@@ -225,6 +227,7 @@ def brightest_galaxy_centers_from_segments(
             j = order[k]               # original galaxy index
             Lj = luminosity[j]
             Lsum += Lj
+            stellar_mass_sum += stellar_mass[j]
             if Lj > best_L:
                 best_L = Lj
                 best_j = j
@@ -242,12 +245,13 @@ def brightest_galaxy_centers_from_segments(
             mag_limit, cz, phi_star, M_star, alpha, omega_matter, h
         )
         centers_lum[i] = Lsum * L_corr
+        group_stellar_mass[i] = stellar_mass_sum
 
-    return unique_gids, centers_ra, centers_dec, centers_z, centers_lum, bcg_mag, group_sizes, central_is_red
+    return unique_gids, centers_ra, centers_dec, centers_z, centers_lum, group_stellar_mass, bcg_mag, group_sizes, central_is_red
 
 @njit
 def brightest_galaxy_centers_fast(
-    luminosity, abs_mags, is_red, ra, dec, z, group_ids,
+    luminosity, stellar_mass, abs_mags, is_red, ra, dec, z, group_ids,
     phi_star, M_star, alpha, mag_limit, omega_matter, h
 ):
     # (Recommended) ensure contiguous dtypes once outside the JIT hot path
@@ -256,6 +260,6 @@ def brightest_galaxy_centers_fast(
 
     return brightest_galaxy_centers_from_segments(
         order, unique_gids, starts, ends,
-        luminosity, abs_mags, is_red, ra, dec, z,
+        luminosity, stellar_mass, abs_mags, is_red, ra, dec, z,
         phi_star, M_star, alpha, mag_limit, omega_matter, h
     )
