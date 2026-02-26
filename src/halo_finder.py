@@ -374,13 +374,13 @@ class HaloFinder:
         #logging.info(f"mag limits: {self.mag_limit}, survey fractional area: {self.survey_fractional_area}")
 
 
-        if self.make_plots:
-            plt.bar(np.log10(self.hmf_masses), self.hmf_mass_intervals, width=0.1)
-            plt.title('Halo Mass Function Intervals')
-            plt.xlabel('log10(Halo Mass / $10^{14}h^{-1}$)')
-            plt.ylabel('dn/dlogM')
-            plt.savefig(f'{self.plot_save_dir}/hmf_intervals_iter_{self.iteration_counter}.png')
-            plt.clf()
+        #if self.make_plots:
+            #plt.bar(np.log10(self.hmf_masses), self.hmf_mass_intervals, width=0.1)
+            #plt.title('Halo Mass Function Intervals')
+            #plt.xlabel('log10(Halo Mass / $10^{14}h^{-1}$)')
+            #plt.ylabel('dn/dlogM')
+            #plt.savefig(f'{self.plot_save_dir}/hmf_intervals_iter_{self.iteration_counter}.png')
+            #plt.clf()
 
 
 
@@ -530,23 +530,34 @@ class TinkerFinder(HaloFinder):
     def run(self):
         logging.info("Running the Tinker Finder...")
         self.load_catalogue_data()
-        self.generate_hmf()
+        #self.generate_hmf()
         self.get_all_comoving_distances()
         self.create_KDE_tree()
         self.initial_group_central_satellite_assignment()
         self.initial_luminosities()
         self.update_group_luminosity_and_centres()
         self.update_group_halo_masses()
+        logging.info(f"Red a threshold: {self.red_a_threshold}")
+        logging.info(f"Red b threshold: {self.red_b_threshold}")
+        logging.info(f"Blue a threshold: {self.blue_a_threshold}")
+        logging.info(f"Red c threshold: {self.red_c_threshold}")
+        logging.info(f"Blue b threshold: {self.blue_b_threshold}")
+        logging.info(f"Blue c threshold: {self.blue_c_threshold}")
         self.iterate_tinker_finder()
         self.s_score()
         logging.info("Tinker Finder run complete.")
 
     def run_cached_cat_hmf_comoving_KDE(self):
-        logging.info("Running the Tinker Finder with cached catalogue, HMF, comoving distances and KDE...")
         self.initial_group_central_satellite_assignment()
         self.initial_luminosities()
         self.update_group_luminosity_and_centres()
         self.update_group_halo_masses()
+        logging.info(f"Red a threshold: {self.red_a_threshold}")
+        logging.info(f"Red b threshold: {self.red_b_threshold}")
+        logging.info(f"Blue a threshold: {self.blue_a_threshold}")
+        logging.info(f"Red c threshold: {self.red_c_threshold}")
+        logging.info(f"Blue b threshold: {self.blue_b_threshold}")
+        logging.info(f"Blue c threshold: {self.blue_c_threshold}")
         self.iterate_tinker_finder()
         self.s_score()
         logging.info("Tinker Finder run complete.")

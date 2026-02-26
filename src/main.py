@@ -60,14 +60,14 @@ def optimize_on_mock(config_reader):
     return minimize(objective_function, initial_params, bounds=bounds, method="L-BFGS-B")
 
 
-def grid_search_on_mock(config_reader, num_points=500):
+def grid_search_on_mock(config_reader, num_points=5):
     bounds = [
-        (5.0, 15.0),    # red_a_threshold
-        (-2.0, 2.0),    # red_b_threshold
-        (-2.0, 2.0),    # red_c_threshold
-        (5.0, 15.0),    # blue_a_threshold
-        (-2.0, 2.0),    # blue_b_threshold
-        (-2.0, 2.0),    # blue_c_threshold
+        (1, 7),    # red_a_threshold
+        (0, 0),    # red_b_threshold
+        (0, 0),    # red_c_threshold
+        (1, 7),    # blue_a_threshold
+        (0, 0),    # blue_b_threshold
+        (0, 0),    # blue_c_threshold
     ]
     param_names = [
         "red_a_threshold",
