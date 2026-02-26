@@ -25,6 +25,7 @@ column_names:
   k_correction: "k-e corr"
   group_id: "HaloID"
   galaxy_is_red: "is_red"
+  stellar_mass: "stellar_mass"
 
 
 file_locations:
@@ -36,14 +37,16 @@ file_locations:
 
 
 setup_options:
-  red_a_threshold: 1 # Probability threshold for the group finder
-  red_b_threshold: 0.5
-  blue_a_threshold: 0.5
-  blue_b_threshold: 0.25
-  red_effective_luminosity_boost_a: 0.9  # Effective luminosity boost parameters for red galaxies
-  red_effective_luminosity_boost_b: 0.1
-  blue_effective_luminosity_boost_a: 0.9  # Effective luminosity boost parameters for blue galaxies
-  blue_effective_luminosity_boost_b: 0.1
+  red_a_threshold: 10.0 # Probability threshold model A term for red galaxies
+  red_b_threshold: 0.0
+  red_c_threshold: 0.0
+  blue_a_threshold: 10.0
+  blue_b_threshold: 0.0
+  blue_c_threshold: 0.0
+  threshold_b_pivot: 13.0
+  threshold_c_pivot: 10.0
+  shmr_slope: 0.7365
+  shmr_intercept: -0.0064
   survey_magnitude_limit: 19.65  # Magnitude limit for the survey
   abs_solar_magnitude_in_band: 4.64  # Absolute solar magnitude
   max_iterations: 8  # Maximum number of iterations for the group finder

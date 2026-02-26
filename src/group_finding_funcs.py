@@ -10,10 +10,9 @@ def negative_exponential_func(x, B_a, B_b, B_c):
     return B_a * np.exp(-B_b * x) + B_c
 
 @njit
-def straight_line_func(x, slope, intercept, pivot = 13.):
-    """ A helper function to compute straight line values.
-    Pivot is at Mh = 10**13 h^-1 M_sun by default."""
-    return slope * (x - pivot) + intercept
+def stellar_mass_dependent_threshold(log_halo_mass, log_stellar_mass, a, b, c, b_piv, c_piv):
+    """Threshold model with halo-mass and stellar-mass dependence."""
+    return a + b * (log_halo_mass - b_piv) + c * (log_stellar_mass - c_piv)
 
 
 @njit(float64[:](int64[:], int64, float64[:], float64[:], float64[:], 
@@ -44,7 +43,7 @@ def compute_probabilities_parallel(
 def update_group_membership_tinker(
     galaxy_ra, galaxy_dec, galaxy_z, galaxy_group_id,
     group_ids, group_ra, group_dec, group_z, group_sizes, group_halo_mass,
-    galaxy_tree, is_central, is_satellite, is_red, thresh_red_a, thresh_red_b, thresh_blue_a, thresh_blue_b, omega_matter, h
+    galaxy_tree, is_central, is_satellite, is_red, galaxy_stellar_mass, thresh_red_a, thresh_red_b, thresh_red_c, thresh_blue_a, thresh_blue_b, thresh_blue_c, b_piv, c_piv, omega_matter, h
 ):
     """
     Update galaxy group membership based on probability threshold.
@@ -64,8 +63,8 @@ def update_group_membership_tinker(
     - is_central: input boolean array indicating current central galaxies
     - is_satellite: input boolean array indicating current satellite galaxies
     - is_red: boolean array indicating if galaxies are classified as red
-    - thresh_red_a, thresh_red_b: Parameters for red galaxy threshold function
-    - thresh_blue_a, thresh_blue_b: Parameters for blue galaxy threshold function
+    - thresh_red_a, thresh_red_b, thresh_red_c: Parameters for red galaxy threshold function
+    - thresh_blue_a, thresh_blue_b, thresh_blue_c: Parameters for blue galaxy threshold function
     - omega_matter: Matter density parameter at z=0
     - h: Dimensionless Hubble parameter (H0/100)
     
@@ -161,13 +160,15 @@ def update_group_membership_tinker(
             
             
             # Assign as satellite if probability exceeds threshold
+            log_halo_mass = np.log10(group_halo_mass[group_idx] * 1e14)
+            log_stellar_mass = np.log10(galaxy_stellar_mass[neighbor_idx])
             if is_red[neighbor_idx]:
-                threshold = straight_line_func(
-                    np.log10(group_halo_mass[group_idx] * 1e14), thresh_red_a, thresh_red_b
+                threshold = stellar_mass_dependent_threshold(
+                    log_halo_mass, log_stellar_mass, thresh_red_a, thresh_red_b, thresh_red_c, b_piv, c_piv
                 )
             else:
-                threshold = straight_line_func(
-                    np.log10(group_halo_mass[group_idx] * 1e14), thresh_blue_a, thresh_blue_b
+                threshold = stellar_mass_dependent_threshold(
+                    log_halo_mass, log_stellar_mass, thresh_blue_a, thresh_blue_b, thresh_blue_c, b_piv, c_piv
                 )
                 
             if prob > threshold:
