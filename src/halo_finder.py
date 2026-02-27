@@ -61,6 +61,7 @@ class HaloFinder:
         self.iteration_group_membership = {}
         self.iteration_central_assignment = {}
         self.iteration_satellite_assignment = {}
+        self.active_group_ids = None
         # self.iteration_central_is_red = {}
 
         # Get run options from config
@@ -484,6 +485,19 @@ class HaloFinder:
 
     def apply_halo_finder(self):
         logging.info("Performing iteration of group finder")
+
+        use_active_groups = self.active_group_ids is not None
+        if use_active_groups:
+            logging.info(
+                "Restricting group updates to %d groups with prior membership changes",
+                len(self.active_group_ids),
+            )
+        active_group_ids = (
+            self.active_group_ids
+            if use_active_groups
+            else np.empty(0, dtype=np.int64)
+        )
+
         self.new_members, self.gal_is_central, self.gal_is_satellite = (
             update_group_membership_halofinder(
                 self.ra,
@@ -511,6 +525,8 @@ class HaloFinder:
                 self.threshold_c_pivot,
                 self.omega_matter,
                 self.h,
+                active_group_ids,
+                use_active_groups,
             )
         )
         logging.info(
@@ -523,7 +539,9 @@ class HaloFinder:
         data = np.column_stack((self.gal_ids, self.group_ids))
         np.savetxt(self.save_path, data, header=header)
 
-    def iterate_halo_finder(self):
+    def iterate_tinker_finder(self):
+        self.active_group_ids = None
+
         while self.iteration_counter < self.max_iterations:
             self.iteration_counter += 1
             logging.info(f"Starting iteration number : {self.iteration_counter}...")
@@ -538,6 +556,15 @@ class HaloFinder:
                 )
                 break
             else:
+                changed_mask = self.new_members != self.group_ids
+                groups_with_removed_members = self.group_ids[changed_mask]
+                groups_with_added_members = self.new_members[changed_mask]
+                self.active_group_ids = np.unique(
+                    np.concatenate(
+                        (groups_with_removed_members, groups_with_added_members)
+                    )
+                )
+
                 self.iteration_group_membership[str(self.iteration_counter)] = (
                     self.new_members.copy()
                 )
