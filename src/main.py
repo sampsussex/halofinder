@@ -16,21 +16,21 @@ def run_single(config_reader):
 def optimize_on_mock(config_reader):
     setup_options = config_reader.get_setup_options()
     initial_params = [
-        setup_options['red_a_threshold'],
-        setup_options['red_b_threshold'],
-        setup_options['red_c_threshold'],
-        setup_options['blue_a_threshold'],
-        setup_options['blue_b_threshold'],
-        setup_options['blue_c_threshold'],
+        setup_options["red_a_threshold"],
+        setup_options["red_b_threshold"],
+        setup_options["red_c_threshold"],
+        setup_options["blue_a_threshold"],
+        setup_options["blue_b_threshold"],
+        setup_options["blue_c_threshold"],
     ]
 
     bounds = [
-        (5.0, 15.0),    # red_a_threshold
-        (-2.0, 2.0),    # red_b_threshold
-        (-2.0, 2.0),    # red_c_threshold
-        (5.0, 15.0),    # blue_a_threshold
-        (-2.0, 2.0),    # blue_b_threshold
-        (-2.0, 2.0),    # blue_c_threshold
+        (5.0, 15.0),  # red_a_threshold
+        (-2.0, 2.0),  # red_b_threshold
+        (-2.0, 2.0),  # red_c_threshold
+        (5.0, 15.0),  # blue_a_threshold
+        (-2.0, 2.0),  # blue_b_threshold
+        (-2.0, 2.0),  # blue_c_threshold
     ]
 
     def objective_function(params):
@@ -57,17 +57,19 @@ def optimize_on_mock(config_reader):
         tinker_finder.run()
         return -tinker_finder.s_tot
 
-    return minimize(objective_function, initial_params, bounds=bounds, method="L-BFGS-B")
+    return minimize(
+        objective_function, initial_params, bounds=bounds, method="L-BFGS-B"
+    )
 
 
 def grid_search_on_mock(config_reader, num_points=5):
     bounds = [
-        (1, 7),    # red_a_threshold
-        (0, 0),    # red_b_threshold
-        (0, 0),    # red_c_threshold
-        (1, 7),    # blue_a_threshold
-        (0, 0),    # blue_b_threshold
-        (0, 0),    # blue_c_threshold
+        (1, 7),  # red_a_threshold
+        (0, 0),  # red_b_threshold
+        (0, 0),  # red_c_threshold
+        (1, 7),  # blue_a_threshold
+        (0, 0),  # blue_b_threshold
+        (0, 0),  # blue_c_threshold
     ]
     param_names = [
         "red_a_threshold",
@@ -86,10 +88,7 @@ def grid_search_on_mock(config_reader, num_points=5):
     while grid_size ** len(bounds) < num_points:
         grid_size += 1
 
-    grid_axes = [
-        np.linspace(lower, upper, grid_size)
-        for lower, upper in bounds
-    ]
+    grid_axes = [np.linspace(lower, upper, grid_size) for lower, upper in bounds]
 
     file_exists = os.path.exists(results_path)
     with open(results_path, "a", encoding="utf-8") as handle:
@@ -110,7 +109,13 @@ def grid_search_on_mock(config_reader, num_points=5):
                 tinker_finder.blue_c_threshold,
             ) = params
             tinker_finder.run()
-            row = ",".join([str(idx), *[f"{value:.6f}" for value in params], f"{tinker_finder.s_tot:.6f}"])
+            row = ",".join(
+                [
+                    str(idx),
+                    *[f"{value:.6f}" for value in params],
+                    f"{tinker_finder.s_tot:.6f}",
+                ]
+            )
             handle.write(f"{row}\n")
             handle.flush()
 
@@ -129,19 +134,18 @@ if __name__ == "__main__":
 
     run_options = config_reader.get_run_options()
 
-    if run_options.get('optimse_on_mock'):
+    if run_options.get("optimse_on_mock"):
         print("Optimising on mock comparison...")
         result = optimize_on_mock(config_reader)
         best_score = -result.fun
         print(f"Best score = {best_score:.3f}")
         print(f"Best parameters = {result.x}")
-    elif run_options.get('optimse_parameter_space'):
+    elif run_options.get("optimse_parameter_space"):
         print("Running parameter-space grid search on mock comparison...")
         results_path = grid_search_on_mock(config_reader, num_points=100)
         print(f"Grid search complete. Results saved to {results_path}")
-    elif run_options.get('run_group_finder') or run_options.get('run_mock_comparison'):
+    elif run_options.get("run_group_finder") or run_options.get("run_mock_comparison"):
         print("Running Halo Finder...")
         finder = run_single(config_reader)
-        if run_options.get('run_mock_comparison'):
+        if run_options.get("run_mock_comparison"):
             print(f"S-score = {finder.s_tot:.6f}")
-        

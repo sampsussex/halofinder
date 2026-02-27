@@ -5,17 +5,17 @@ from luminosity_funcs import luminosity_correction_factor
 
 @njit
 def find_all_initial_mass_to_light(group_luminosity, mass_light_gain):
-    """ Calculate initial halo masses based on group luminosity and mass-light gain factor."""
-    #placeholder, using intitaly 500 value
+    """Calculate initial halo masses based on group luminosity and mass-light gain factor."""
+    # placeholder, using intitaly 500 value
     halo_masses = np.zeros(len(group_luminosity))
     for i in range(len(group_luminosity)):
-        halo_masses[i] = mass_light_gain*group_luminosity[i]
+        halo_masses[i] = mass_light_gain * group_luminosity[i]
     return halo_masses
-    
+
 
 @njit
 def find_group_sizes(group_ids):
-    """ Returns the number of galaxies in each group from group IDs."""
+    """Returns the number of galaxies in each group from group IDs."""
     unique_ids = np.unique(group_ids)
     remapped = np.searchsorted(unique_ids, group_ids)
     sizes = np.bincount(remapped)
@@ -23,11 +23,25 @@ def find_group_sizes(group_ids):
 
 
 @njit(parallel=True)
-def brightest_galaxy_centers(luminosity, abs_mags, is_red, ra, dec, z, group_ids, phi_star, M_star, alpha, mag_limit, omega_matter, h):
+def brightest_galaxy_centers(
+    luminosity,
+    abs_mags,
+    is_red,
+    ra,
+    dec,
+    z,
+    group_ids,
+    phi_star,
+    M_star,
+    alpha,
+    mag_limit,
+    omega_matter,
+    h,
+):
     """
     Returns the group properties and locations from a list of galaxies and group assignments.
     Centers are placed at the brightest galaxy in each group.
-    
+
     Parameters:
     ----------
     luminosity : np.array(float)
@@ -58,7 +72,7 @@ def brightest_galaxy_centers(luminosity, abs_mags, is_red, ra, dec, z, group_ids
         Matter density parameter at z=0
     h : float
         Dimensionless Hubble parameter (H0/100)
-    
+
     Returns:
     -------
     np.array(int)
@@ -85,18 +99,18 @@ def brightest_galaxy_centers(luminosity, abs_mags, is_red, ra, dec, z, group_ids
     group_sizes = find_group_sizes(group_ids)
     bcg_mag = np.zeros(n_groups)
     central_is_red = np.zeros(n_groups, dtype=np.bool_)
-    
+
     for i in prange(n_groups):
         gid = unique_groups[i]
         # Select galaxies in group
         mask = group_ids == gid
-        
+
         # Extract data for group
         L = luminosity[mask]
         RA = ra[mask]
         DEC = dec[mask]
         Z = z[mask]
-        
+
         # Check if group has only one galaxy
         if len(L) == 1:
             # Single galaxy case - use its properties directly
@@ -104,37 +118,48 @@ def brightest_galaxy_centers(luminosity, abs_mags, is_red, ra, dec, z, group_ids
             centers_dec[i] = DEC[0]
             centers_z[i] = Z[0]
             # Still need luminosity correction
-            
-            L_corr = luminosity_correction_factor(mag_limit, Z[0], phi_star, M_star, alpha, omega_matter, h)
-            #print(L_corr)
+
+            L_corr = luminosity_correction_factor(
+                mag_limit, Z[0], phi_star, M_star, alpha, omega_matter, h
+            )
+            # print(L_corr)
             centers_lum[i] = L[0] * L_corr
 
             bcg_mag[i] = abs_mags[mask][0]
-
 
             central_is_red[i] = is_red[mask][0]
 
         else:
             # Multi-galaxy case - find brightest galaxy
             brightest_idx = np.argmax(L)
-            
+
             # Use brightest galaxy's position and redshift as center
             centers_ra[i] = RA[brightest_idx]
             centers_dec[i] = DEC[brightest_idx]
             centers_z[i] = Z[brightest_idx]
-            
+
             # Total luminosity with correction based on brightest galaxy's redshift
             Lsum = np.sum(L)
-            
-            L_corr = luminosity_correction_factor(mag_limit, Z[brightest_idx], phi_star, M_star, alpha, omega_matter, h)
-            #print(L_corr)
+
+            L_corr = luminosity_correction_factor(
+                mag_limit, Z[brightest_idx], phi_star, M_star, alpha, omega_matter, h
+            )
+            # print(L_corr)
             centers_lum[i] = Lsum * L_corr
             central_is_red[i] = is_red[mask][brightest_idx]
 
-
             bcg_mag[i] = abs_mags[mask][brightest_idx]
-    
-    return unique_groups, centers_ra, centers_dec, centers_z, centers_lum, bcg_mag, group_sizes, central_is_red
+
+    return (
+        unique_groups,
+        centers_ra,
+        centers_dec,
+        centers_z,
+        centers_lum,
+        bcg_mag,
+        group_sizes,
+        central_is_red,
+    )
 
 
 @njit(cache=True)
@@ -148,12 +173,18 @@ def sort_and_build_segments(group_ids):
       ends         : end index (exclusive, in sorted arrays) per group
     """
     n = group_ids.size
-    order = np.argsort(group_ids)                 # JIT-supported
+    order = np.argsort(group_ids)  # JIT-supported
     gid_sorted = group_ids[order]
 
     # Edge case: empty input
     if n == 0:
-        return order, gid_sorted, np.empty(0, np.int64), np.empty(0, np.int64), np.empty(0, np.int64)
+        return (
+            order,
+            gid_sorted,
+            np.empty(0, np.int64),
+            np.empty(0, np.int64),
+            np.empty(0, np.int64),
+        )
 
     # Pass 1: count groups (= number of runs)
     n_groups = 1
@@ -193,9 +224,23 @@ def sort_and_build_segments(group_ids):
 # ------------------------------------------------------------
 @njit(parallel=True)
 def brightest_galaxy_centers_from_segments(
-    order, unique_gids, starts, ends,
-    luminosity, stellar_mass, abs_mags, is_red, ra, dec, z,
-    phi_star, M_star, alpha, mag_limit, omega_matter, h
+    order,
+    unique_gids,
+    starts,
+    ends,
+    luminosity,
+    stellar_mass,
+    abs_mags,
+    is_red,
+    ra,
+    dec,
+    z,
+    phi_star,
+    M_star,
+    alpha,
+    mag_limit,
+    omega_matter,
+    h,
 ):
     """
     Same outputs as your original function, but uses (order, starts, ends)
@@ -224,7 +269,7 @@ def brightest_galaxy_centers_from_segments(
         best_j = -1
 
         for k in range(s, e):
-            j = order[k]               # original galaxy index
+            j = order[k]  # original galaxy index
             Lj = luminosity[j]
             Lsum += Lj
             stellar_mass_sum += stellar_mass[j]
@@ -247,19 +292,56 @@ def brightest_galaxy_centers_from_segments(
         centers_lum[i] = Lsum * L_corr
         group_stellar_mass[i] = stellar_mass_sum
 
-    return unique_gids, centers_ra, centers_dec, centers_z, centers_lum, group_stellar_mass, bcg_mag, group_sizes, central_is_red
+    return (
+        unique_gids,
+        centers_ra,
+        centers_dec,
+        centers_z,
+        centers_lum,
+        group_stellar_mass,
+        bcg_mag,
+        group_sizes,
+        central_is_red,
+    )
+
 
 @njit
 def brightest_galaxy_centers_fast(
-    luminosity, stellar_mass, abs_mags, is_red, ra, dec, z, group_ids,
-    phi_star, M_star, alpha, mag_limit, omega_matter, h
+    luminosity,
+    stellar_mass,
+    abs_mags,
+    is_red,
+    ra,
+    dec,
+    z,
+    group_ids,
+    phi_star,
+    M_star,
+    alpha,
+    mag_limit,
+    omega_matter,
+    h,
 ):
     # (Recommended) ensure contiguous dtypes once outside the JIT hot path
 
     order, gid_sorted, unique_gids, starts, ends = sort_and_build_segments(group_ids)
 
     return brightest_galaxy_centers_from_segments(
-        order, unique_gids, starts, ends,
-        luminosity, stellar_mass, abs_mags, is_red, ra, dec, z,
-        phi_star, M_star, alpha, mag_limit, omega_matter, h
+        order,
+        unique_gids,
+        starts,
+        ends,
+        luminosity,
+        stellar_mass,
+        abs_mags,
+        is_red,
+        ra,
+        dec,
+        z,
+        phi_star,
+        M_star,
+        alpha,
+        mag_limit,
+        omega_matter,
+        h,
     )
