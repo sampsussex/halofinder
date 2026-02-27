@@ -16,7 +16,7 @@ from group_properties_funcs import (
     brightest_galaxy_centers_fast,
 )
 from luminosity_funcs import k_corr, generate_hmf
-from group_finding_funcs import update_group_membership_tinker
+from group_finding_funcs import update_group_membership_halofinder
 from utils import ConfigReader
 from bijective_matching import s_score
 
@@ -24,9 +24,7 @@ from bijective_matching import s_score
 # To do list - For MVP
 # 5logh needs to be in magnitudes, which are all in absolute mags
 # Take in k corrections from input gal catalog.
-# //TODO add plotting trigger in config
-# //TODO implement cached catalog/comoving/hmf/kde tree loading when optimising on mock
-# //TODO fix high mass end of hmf
+# //TODO fix high mass end of hmf (where i always get 1 of the highest possible mass in the hmf range)
 
 
 # For paper
@@ -44,7 +42,7 @@ logging.basicConfig(
 
 
 # ------------------------
-# YangFinder Class
+# Halofinder Class
 # ------------------------
 class HaloFinder:
     _shared_cache = {}
@@ -484,10 +482,10 @@ class HaloFinder:
 
         logging.info("Halo masses updated.")
 
-    def apply_tinker_finder(self):
+    def apply_halo_finder(self):
         logging.info("Performing iteration of group finder")
         self.new_members, self.gal_is_central, self.gal_is_satellite = (
-            update_group_membership_tinker(
+            update_group_membership_halofinder(
                 self.ra,
                 self.dec,
                 self.zobs,
@@ -525,11 +523,11 @@ class HaloFinder:
         data = np.column_stack((self.gal_ids, self.group_ids))
         np.savetxt(self.save_path, data, header=header)
 
-    def iterate_tinker_finder(self):
+    def iterate_halo_finder(self):
         while self.iteration_counter < self.max_iterations:
             self.iteration_counter += 1
             logging.info(f"Starting iteration number : {self.iteration_counter}...")
-            self.apply_tinker_finder()
+            self.apply_halo_finder()
             changed_group_values = np.sum(self.new_members != self.group_ids)
             logging.info(
                 f"{changed_group_values} galaxies have changed group membership last iteration"
@@ -652,7 +650,7 @@ class HaloFinder:
 # ------------------------
 
 
-class TinkerFinder(HaloFinder):
+class RunHaloFinder(HaloFinder):
     def __init__(self, config_reader):
         """
         Initialize TinkerFinder with configuration from ConfigReader.
@@ -679,7 +677,7 @@ class TinkerFinder(HaloFinder):
         logging.info(f"Red c threshold: {self.red_c_threshold}")
         logging.info(f"Blue b threshold: {self.blue_b_threshold}")
         logging.info(f"Blue c threshold: {self.blue_c_threshold}")
-        self.iterate_tinker_finder()
+        self.iterate_halo_finder()
         self.s_score()
         logging.info("Tinker Finder run complete.")
 
@@ -694,6 +692,6 @@ class TinkerFinder(HaloFinder):
         logging.info(f"Red c threshold: {self.red_c_threshold}")
         logging.info(f"Blue b threshold: {self.blue_b_threshold}")
         logging.info(f"Blue c threshold: {self.blue_c_threshold}")
-        self.iterate_tinker_finder()
+        self.iterate_halo_finder()
         self.s_score()
         logging.info("Tinker Finder run complete.")

@@ -1,5 +1,5 @@
 from utils import ConfigReader
-from halo_finder import TinkerFinder
+from halo_finder import RunHaloFinder
 from scipy.optimize import minimize
 import itertools
 import numpy as np
@@ -8,7 +8,7 @@ import sys
 
 
 def run_single(config_reader):
-    tinker_finder = TinkerFinder(config_reader)
+    tinker_finder = RunHaloFinder(config_reader)
     tinker_finder.run()
     return tinker_finder
 
@@ -42,7 +42,7 @@ def optimize_on_mock(config_reader):
             blue_b,
             blue_c,
         ) = params
-        tinker_finder = TinkerFinder(config_reader)
+        tinker_finder = RunHaloFinder(config_reader)
         tinker_finder.red_a_threshold = red_a
         tinker_finder.red_b_threshold = red_b
         tinker_finder.red_c_threshold = red_c
@@ -99,7 +99,7 @@ def grid_search_on_mock(config_reader, num_points=5):
         for idx, params in enumerate(itertools.product(*grid_axes)):
             if idx >= num_points:
                 break
-            tinker_finder = TinkerFinder(config_reader)
+            tinker_finder = RunHaloFinder(config_reader)
             (
                 tinker_finder.red_a_threshold,
                 tinker_finder.red_b_threshold,

@@ -76,7 +76,7 @@ def compute_probabilities_parallel(
 
 
 @njit
-def update_group_membership_tinker(
+def update_group_membership_halofinder(
     galaxy_ra,
     galaxy_dec,
     galaxy_z,
