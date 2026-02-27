@@ -8,7 +8,9 @@ from astropy.constants import G
 from astropy import units as u
 
 # Import functions from your src folder
-import sys, os
+import os
+import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from halo_p_M_funcs import (  # change filename if needed
@@ -73,17 +75,19 @@ def test_concentration_ratio_relations_and_errors():
         find_concentration_ratio(M, z, concentraion_relation="BadModel")
     # Wrong delta_crit raises
     with pytest.raises(ValueError):
-        find_concentration_ratio(M, z, concentraion_relation="Maccio08", delta_crit=500.0)
+        find_concentration_ratio(
+            M, z, concentraion_relation="Maccio08", delta_crit=500.0
+        )
 
 
 def test_fx_behavior_limits():
     rs = 1.0
     # At exactly r=rs, expect ~1/3
-    assert_allclose(f_x(rs, rs), 1.0/3.0, rtol=1e-12)
+    assert_allclose(f_x(rs, rs), 1.0 / 3.0, rtol=1e-12)
     # At small x < 1
-    val1 = f_x(rs, 0.5*rs)
+    val1 = f_x(rs, 0.5 * rs)
     # At large x > 1
-    val2 = f_x(rs, 2.0*rs)
+    val2 = f_x(rs, 2.0 * rs)
     assert np.isfinite(val1) and np.isfinite(val2)
 
 
@@ -131,7 +135,7 @@ def test_find_p_M_special_cases():
     h = 0.7
     z_group = 0.2
     z_gal = 0.22
-    M = 10.
+    M = 10.0
     # Coincident group & galaxy → inf
     val_inf = find_p_M(10, 10, 10, 10, z_group, z_group, M, om, h)
     assert np.isinf(val_inf)

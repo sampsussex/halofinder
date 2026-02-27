@@ -128,11 +128,15 @@ def test_luminosity_magnitude_roundtrip():
     mag = luminosity_to_mag(L, M_sun)
     L_back = magnitude_to_luminosity(mag, M_sun)
     # original L vs L_back should match within numerical precision
-    assert_allclose(L_back, L * (10**14), rtol=1e-12, atol=0.0)  # magnitude_to_luminosity returns absolute L in L_sun
+    assert_allclose(
+        L_back, L * (10**14), rtol=1e-12, atol=0.0
+    )  # magnitude_to_luminosity returns absolute L in L_sun
     # Test array versions
     Ls = np.array([0.1, 1.0, 5.0])
     mags = get_all_luminosity_to_magnitude(Ls, M_sun)
-    Ls_back = get_all_magnitude_to_luminosity(mags, M_sun)  # note: this returns L / 1e14
+    Ls_back = get_all_magnitude_to_luminosity(
+        mags, M_sun
+    )  # note: this returns L / 1e14
     assert_allclose(Ls_back, Ls, rtol=1e-12, atol=0.0)
 
 
@@ -155,10 +159,16 @@ def test_spherical_to_cartesian_and_batch():
     decs = np.array([dec, dec + 5.0])
     ds = np.array([d, d + 200.0])
     all_xyz = find_all_spherical_to_cartesian(ras, decs, ds)
-    expected_batch = np.vstack([expected,
-                                np.array([
-                                    ds[1] * np.cos(np.deg2rad(decs[1])) * np.cos(np.deg2rad(ras[1])),
-                                    ds[1] * np.cos(np.deg2rad(decs[1])) * np.sin(np.deg2rad(ras[1])),
-                                    ds[1] * np.sin(np.deg2rad(decs[1])),
-                                ])])
+    expected_batch = np.vstack(
+        [
+            expected,
+            np.array(
+                [
+                    ds[1] * np.cos(np.deg2rad(decs[1])) * np.cos(np.deg2rad(ras[1])),
+                    ds[1] * np.cos(np.deg2rad(decs[1])) * np.sin(np.deg2rad(ras[1])),
+                    ds[1] * np.sin(np.deg2rad(decs[1])),
+                ]
+            ),
+        ]
+    )
     assert_allclose(all_xyz, expected_batch, rtol=1e-12, atol=0.0)
