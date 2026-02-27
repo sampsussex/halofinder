@@ -102,6 +102,8 @@ def update_group_membership_tinker(
     c_piv,
     omega_matter,
     h,
+    active_group_ids,
+    use_active_groups,
 ):
     """
     Update galaxy group membership based on probability threshold.
@@ -157,6 +159,29 @@ def update_group_membership_tinker(
     # Sort groups by halo mass in descending order
     sorted_group_indices = np.argsort(-group_halo_mass)
 
+    if use_active_groups:
+        active_group_mask = np.zeros(max_group_id + 1, dtype=np.bool_)
+        for i in range(len(active_group_ids)):
+            gid = active_group_ids[i]
+            if gid >= 0 and gid <= max_group_id and group_id_to_idx[gid] >= 0:
+                active_group_mask[gid] = True
+
+        active_count = 0
+        for i in range(len(sorted_group_indices)):
+            group_idx = sorted_group_indices[i]
+            if active_group_mask[group_ids[group_idx]]:
+                active_count += 1
+
+        groups_to_process = np.empty(active_count, dtype=np.int64)
+        write_idx = 0
+        for i in range(len(sorted_group_indices)):
+            group_idx = sorted_group_indices[i]
+            if active_group_mask[group_ids[group_idx]]:
+                groups_to_process[write_idx] = group_idx
+                write_idx += 1
+    else:
+        groups_to_process = sorted_group_indices
+
     # Get group coordinates in cartesian space
     group_comoving_distance = get_all_comoving_distance(group_z, omega_matter)
     group_coords = find_all_spherical_to_cartesian(
@@ -167,8 +192,8 @@ def update_group_membership_tinker(
     # This is where we can gain the most from parallelization
 
     # Process each group in order of decreasing halo mass
-    for sorted_idx in range(n_groups):
-        group_idx = sorted_group_indices[sorted_idx]
+    for sorted_idx in range(len(groups_to_process)):
+        group_idx = groups_to_process[sorted_idx]
         central_idx = central_galaxy_indices[group_idx]
 
         if central_idx < 0:
