@@ -15,7 +15,7 @@ from group_properties_funcs import (
     brightest_galaxy_centers,
     brightest_galaxy_centers_fast,
 )
-from luminosity_funcs import k_corr, generate_hmf
+from luminosity_funcs import k_corr, generate_hmf, update_halo_masses
 from group_finding_funcs import update_group_membership_halofinder
 from utils import ConfigReader
 from bijective_matching import s_score
@@ -67,6 +67,13 @@ class HaloFinder:
         # Get run options from config
         run_options = config_reader.get_run_options()
         self.make_plots = run_options.get("make_plots", True)
+        self.mass_assignment_mode = run_options.get("mode", "shmr").strip().lower()
+        valid_mass_modes = {"abundance_match", "shmr", "lhmr"}
+        if self.mass_assignment_mode not in valid_mass_modes:
+            raise ValueError(
+                f"Invalid run_options.mode '{self.mass_assignment_mode}'. "
+                f"Expected one of {sorted(valid_mass_modes)}."
+            )
         self.use_shared_cache = run_options.get(
             "optimse_on_mock", False
         ) or run_options.get("optimse_parameter_space", False)
@@ -96,6 +103,8 @@ class HaloFinder:
         self.threshold_c_pivot = setup_options["threshold_c_pivot"]
         self.shmr_slope = setup_options["shmr_slope"]
         self.shmr_intercept = setup_options["shmr_intercept"]
+        self.lhmr_slope = setup_options.get("lhmr_slope", self.shmr_slope)
+        self.lhmr_intercept = setup_options.get("lhmr_intercept", self.shmr_intercept)
         # self.b_threshold = setup_options.get('b_threshold', 0.0)
 
         # Get file paths from config
@@ -138,6 +147,7 @@ class HaloFinder:
         logging.info(f"Red c threshold: {self.red_c_threshold}")
         logging.info(f"Blue b threshold: {self.blue_b_threshold}")
         logging.info(f"Blue c threshold: {self.blue_c_threshold}")
+        logging.info(f"Mass assignment mode: {self.mass_assignment_mode}")
 
         # logging.info(f"B parameter threshold: {self.b_threshold}")
         logging.info(f"Save path: {self.save_path}")
@@ -466,14 +476,40 @@ class HaloFinder:
         # plt.savefig(f'{self.plot_save_dir}/hmf_intervals_iter_{self.iteration_counter}.png')
         # plt.clf()
 
-        self.group_halo_masses = (
-            10
-            ** (
-                self.shmr_slope * np.log10(self.group_stellar_masses)
-                + self.shmr_intercept
+        if self.mass_assignment_mode == "abundance_match":
+            self.group_halo_masses = update_halo_masses(
+                self.group_bcg_abs_mag,
+                self.group_centres_z,
+                self.group_bcg_abs_mag,
+                self.group_bcg_k_corrs,
+                self.group_bcg_is_red,
+                self.mag_limit,
+                self.survey_fractional_area,
+                self.hmf_masses,
+                self.hmf_mass_intervals,
+                self.omega_matter,
+                self.h,
+                self.red_a_threshold,
+                self.red_b_threshold,
             )
-            / 1e14
-        )
+        elif self.mass_assignment_mode == "lhmr":
+            self.group_halo_masses = (
+                10
+                ** (
+                    self.lhmr_slope * np.log10(self.group_luminosities)
+                    + self.lhmr_intercept
+                )
+                / 1e14
+            )
+        else:
+            self.group_halo_masses = (
+                10
+                ** (
+                    self.shmr_slope * np.log10(self.group_stellar_masses)
+                    + self.shmr_intercept
+                )
+                / 1e14
+            )
         if self.make_plots:
             plt.hist(np.log10(1e14 * self.group_halo_masses), log=True, bins=25)
             plt.savefig(
@@ -691,7 +727,8 @@ class RunHaloFinder(HaloFinder):
     def run(self):
         logging.info("Running the Tinker Finder...")
         self.load_catalogue_data()
-        # self.generate_hmf()
+        if self.mass_assignment_mode == "abundance_match":
+            self.generate_hmf()
         self.get_all_comoving_distances()
         self.create_KDE_tree()
         self.initial_group_central_satellite_assignment()
@@ -709,6 +746,8 @@ class RunHaloFinder(HaloFinder):
         logging.info("Tinker Finder run complete.")
 
     def run_cached_cat_hmf_comoving_KDE(self):
+        if self.mass_assignment_mode == "abundance_match":
+            self.generate_hmf()
         self.initial_group_central_satellite_assignment()
         self.initial_luminosities()
         self.update_group_luminosity_and_centres()
