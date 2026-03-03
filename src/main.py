@@ -18,41 +18,33 @@ def optimize_on_mock(config_reader):
     initial_params = [
         setup_options["red_a_threshold"],
         setup_options["red_b_threshold"],
-        setup_options["red_c_threshold"],
         setup_options["blue_a_threshold"],
         setup_options["blue_b_threshold"],
-        setup_options["blue_c_threshold"],
     ]
 
     bounds = [
         (5.0, 15.0),  # red_a_threshold
         (-2.0, 2.0),  # red_b_threshold
-        (-2.0, 2.0),  # red_c_threshold
         (5.0, 15.0),  # blue_a_threshold
         (-2.0, 2.0),  # blue_b_threshold
-        (-2.0, 2.0),  # blue_c_threshold
     ]
 
     def objective_function(params):
         (
             red_a,
             red_b,
-            red_c,
             blue_a,
             blue_b,
-            blue_c,
         ) = params
         halo_finder = RunHaloFinder(config_reader)
         halo_finder.red_a_threshold = red_a
         halo_finder.red_b_threshold = red_b
-        halo_finder.red_c_threshold = red_c
         halo_finder.blue_a_threshold = blue_a
         halo_finder.blue_b_threshold = blue_b
-        halo_finder.blue_c_threshold = blue_c
         print(
             "Optimising params: "
-            f"red_a={red_a:.4f}, red_b={red_b:.4f}, red_c={red_c:.4f}, "
-            f"blue_a={blue_a:.4f}, blue_b={blue_b:.4f}, blue_c={blue_c:.4f}"
+            f"red_a={red_a:.4f}, red_b={red_b:.4f}, "
+            f"blue_a={blue_a:.4f}, blue_b={blue_b:.4f}"
         )
         halo_finder.run()
         return -halo_finder.s_tot
@@ -66,18 +58,14 @@ def grid_search_on_mock(config_reader, num_points=5):
     bounds = [
         (1, 7),  # red_a_threshold
         (0, 0),  # red_b_threshold
-        (0, 0),  # red_c_threshold
         (1, 7),  # blue_a_threshold
         (0, 0),  # blue_b_threshold
-        (0, 0),  # blue_c_threshold
     ]
     param_names = [
         "red_a_threshold",
         "red_b_threshold",
-        "red_c_threshold",
         "blue_a_threshold",
         "blue_b_threshold",
-        "blue_c_threshold",
     ]
 
     file_locations = config_reader.get_file_locations()
@@ -103,10 +91,8 @@ def grid_search_on_mock(config_reader, num_points=5):
             (
                 halo_finder.red_a_threshold,
                 halo_finder.red_b_threshold,
-                halo_finder.red_c_threshold,
                 halo_finder.blue_a_threshold,
                 halo_finder.blue_b_threshold,
-                halo_finder.blue_c_threshold,
             ) = params
             halo_finder.run()
             row = ",".join(
