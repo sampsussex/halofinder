@@ -97,16 +97,17 @@ class HaloFinder:
         self.remove_isolated_galaxies = setup_options["remove_isolated_galaxies"]
         self.red_a_threshold = setup_options["red_a_threshold"]
         self.red_b_threshold = setup_options["red_b_threshold"]
-        self.red_c_threshold = setup_options["red_c_threshold"]
         self.blue_a_threshold = setup_options["blue_a_threshold"]
         self.blue_b_threshold = setup_options["blue_b_threshold"]
-        self.blue_c_threshold = setup_options["blue_c_threshold"]
         self.threshold_b_pivot = setup_options["threshold_b_pivot"]
-        self.threshold_c_pivot = setup_options["threshold_c_pivot"]
         self.shmr_slope = setup_options["shmr_slope"]
         self.shmr_intercept = setup_options["shmr_intercept"]
         self.lhmr_slope = setup_options["lhmr_slope"]
         self.lhmr_intercept = setup_options["lhmr_intercept"]
+        self.lhmr_slope_red = setup_options["lhmr_slope_red"]
+        self.lhmr_intercept_red = setup_options["lhmr_intercept_red"]
+        self.lhmr_slope_blue = setup_options["lhmr_slope_blue"]
+        self.lhmr_intercept_blue = setup_options["lhmr_intercept_blue"]
 
         # self.b_threshold = setup_options.get('b_threshold', 0.0)
 
@@ -155,6 +156,7 @@ class HaloFinder:
             self.omega_matter,
             self.h,
             self.remove_isolated_galaxies,
+            self.mass_assignment_mode,
         )
 
     def _get_cache(self):
@@ -179,7 +181,8 @@ class HaloFinder:
             self.abs_mag = cached["abs_mag"].copy()
             self.k_corr = cached["k_corr"].copy()
             self.is_red = cached["is_red"].copy()
-            self.stellar_mass = cached["stellar_mass"].copy()
+            if self.mass_assignment_mode == "shmr":
+                self.stellar_mass = cached["stellar_mass"].copy()
             self.id_group_sky = cached["id_group_sky"].copy()
             logging.info("Loaded catalogue data from cache.")
             return
@@ -203,9 +206,10 @@ class HaloFinder:
             )
             self.k_corr = np.array(data[column_names["k_correction"]], dtype="float64")
             self.is_red = np.array(data[column_names["galaxy_is_red"]], dtype=bool)
-            self.stellar_mass = np.array(
-                data[column_names["stellar_mass"]], dtype="float64"
-            )
+            if self.mass_assignment_mode == "shmr":
+                self.stellar_mass = np.array(
+                    data[column_names["stellar_mass"]], dtype="float64"
+                )
 
             # Handle group ID - might be same as galaxy ID for some datasets
             if "group_id" in column_names and column_names["group_id"] in data.colnames:
@@ -235,7 +239,8 @@ class HaloFinder:
                 self.id_group_sky = self.id_group_sky[mask]
                 self.k_corr = self.k_corr[mask]
                 self.is_red = self.is_red[mask]
-                self.stellar_mass = self.stellar_mass[mask]
+                if self.mass_assignment_mode == "shmr":
+                    self.stellar_mass = self.stellar_mass[mask]
                 logging.info(
                     f"Isolated galaxies removed. Remaining galaxies: {len(self.gal_ids)}"
                 )
@@ -252,7 +257,7 @@ class HaloFinder:
         logging.info(f"Galaxy data extracted: {len(self.gal_ids)} galaxies")
 
         if cache is not None:
-            cache["catalogue"] = {
+            cache_catalogue = {
                 "gal_ids": self.gal_ids.copy(),
                 "zobs": self.zobs.copy(),
                 "ra": self.ra.copy(),
@@ -260,9 +265,11 @@ class HaloFinder:
                 "abs_mag": self.abs_mag.copy(),
                 "k_corr": self.k_corr.copy(),
                 "is_red": self.is_red.copy(),
-                "stellar_mass": self.stellar_mass.copy(),
                 "id_group_sky": self.id_group_sky.copy(),
             }
+            if self.mass_assignment_mode == "shmr":
+                cache_catalogue["stellar_mass"] = self.stellar_mass.copy()
+            cache["catalogue"] = cache_catalogue
 
     def generate_hmf(self):
         logging.info("Generating Halo Mass Function (HMF)...")
@@ -380,6 +387,7 @@ class HaloFinder:
             "Updating group properites and centres..."
         )
 
+        stellar_mass = self.stellar_mass if self.mass_assignment_mode == "shmr" else np.ones_like(self.gal_luminosities)
         (
             self.unique_groups,
             self.group_centres_ra,
@@ -392,7 +400,7 @@ class HaloFinder:
             self.group_bcg_is_red,
         ) = brightest_galaxy_centers_fast(
             self.gal_luminosities,
-            self.stellar_mass,
+            stellar_mass,
             self.abs_mag,
             self.is_red,
             self.ra,
@@ -454,28 +462,27 @@ class HaloFinder:
             self.group_halo_masses = linear_luminosity2halo_mass(self.group_luminosities, self.lhmr_intercept, self.lhmr_slope)
 
         elif self.mass_assignment_mode == 'red_blue_lhmr':
-            self.group_halo_masses = red_blue_linear_luminosity2halo_mass(self.group_luminosities, 
-                                                                          self.group_bcg_is_red,
-                                                                          self.lhmr_intercept_red,
-                                                                          self.lhmr_slope_red,
-                                                                          self.lhmr_intercept_blue, 
-                                                                          self.lhmr_slope_blue, 
-                                                                          self.lhmr_intercept_blue)
+            self.group_halo_masses = red_blue_linear_luminosity2halo_mass(
+                self.group_luminosities,
+                self.group_bcg_is_red,
+                self.lhmr_intercept_red,
+                self.lhmr_slope_red,
+                self.lhmr_intercept_blue,
+                self.lhmr_slope_blue,
+            )
         elif self.mass_assignment_mode == "abundance_match":
-            self.group_halo_masses = abundance_match_halo_masses(self.group_luminosities, 
-                                                                 self.group_centres_z, 
-                                                                 self.group_bcg_abs_mag,
-                                                                 self.group_bcg_k_corrs,
-                                                                 self.group_bcg_is_red,
-                                                                 self.mag_limit,
-                                                                 self.survey_fractional_area,
-                                                                 self.hmf_masses,
-                                                                 self.hmf_dlog10m,
-                                                                 self.omega_matter,
-                                                                 self.h,
-                                                                 self.red_mag_boost_a,
-                                                                 self.red_mag_boost_b
-                                                                 )
+            self.group_halo_masses = abundance_match_halo_masses(
+                self.group_luminosities,
+                self.group_centres_z,
+                self.group_bcg_abs_mag,
+                self.group_bcg_k_corrs,
+                self.mag_limit,
+                self.survey_fractional_area,
+                self.hmf_masses,
+                self.hmf_dlog10m,
+                self.omega_matter,
+                self.h,
+            )
 
         if self.make_plots:
             plt.hist(np.log10(1e14 * self.group_halo_masses), log=True, bins=25)
@@ -520,15 +527,11 @@ class HaloFinder:
                 self.gal_is_central,
                 self.gal_is_satellite,
                 self.is_red,
-                self.stellar_mass,
                 self.red_a_threshold,
                 self.red_b_threshold,
-                self.red_c_threshold,
                 self.blue_a_threshold,
                 self.blue_b_threshold,
-                self.blue_c_threshold,
                 self.threshold_b_pivot,
-                self.threshold_c_pivot,
                 self.omega_matter,
                 self.h,
                 active_group_ids,
@@ -706,10 +709,8 @@ class RunHaloFinder(HaloFinder):
         logging.info(f"Tunable parameters for this run:")
         logging.info(f"Red a threshold: {self.red_a_threshold}")
         logging.info(f"Red b threshold: {self.red_b_threshold}")
-        logging.info(f"Red c threshold: {self.red_c_threshold}")
         logging.info(f"Blue a threshold: {self.blue_a_threshold}")
         logging.info(f"Blue b threshold: {self.blue_b_threshold}")
-        logging.info(f"Blue c threshold: {self.blue_c_threshold}")
         self.iterate_halo_finder()
         if self.run_mock_comparion == True:
             self.s_score()
@@ -727,10 +728,8 @@ class RunHaloFinder(HaloFinder):
         logging.info(f"Tunable parameters for this run:")
         logging.info(f"Red a threshold: {self.red_a_threshold}")
         logging.info(f"Red b threshold: {self.red_b_threshold}")
-        logging.info(f"Red c threshold: {self.red_c_threshold}")
         logging.info(f"Blue a threshold: {self.blue_a_threshold}")
         logging.info(f"Blue b threshold: {self.blue_b_threshold}")
-        logging.info(f"Blue c threshold: {self.blue_c_threshold}")
         self.iterate_halo_finder()
         if self.run_mock_comparion == True:
             self.s_score()

@@ -474,15 +474,12 @@ def abundance_match_halo_masses(
     zs,
     bcg_abs_mags,
     bcg_k_corrs,
-    bcg_is_red,
     survey_mag_limit,
     survey_fractional_area,
     hmf_masses,
     dn_dlogM,
     omega_matter,
     h,
-    red_mag_boost_a,
-    red_mag_boost_b,
 ):
     """
     Main function to update halo masses based on luminosity function matching.
@@ -513,17 +510,8 @@ def abundance_match_halo_masses(
     matched_masses : array
         Array of halo mass thresholds in 10^14 h^-1 Msun corresponding to each galaxy.
     """
-    boosted_abs_mags = np.empty_like(bcg_abs_mags)
-    for i in range(len(bcg_abs_mags)):
-        if bcg_is_red[i]:
-            boosted_abs_mags[i] = abs_mags[i] - (
-                red_mag_boost_a + red_mag_boost_b * (abs_mags[i] + 20.0)
-            )
-        else:
-            boosted_abs_mags[i] = abs_mags[i]
-
     phi, bins = generate_empircal_lf(
-        boosted_abs_mags,
+        abs_mags,
         zs,
         bcg_abs_mags,
         bcg_k_corrs,
@@ -533,7 +521,7 @@ def abundance_match_halo_masses(
         h,
     )
 
-    matched_masses = lf_to_hmf_match(boosted_abs_mags, phi, bins, hmf_masses, dn_dlogM)
+    matched_masses = lf_to_hmf_match(abs_mags, phi, bins, hmf_masses, dn_dlogM)
 
     return (
         matched_masses / 1e14

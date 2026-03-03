@@ -16,11 +16,9 @@ def negative_exponential_func(x, B_a, B_b, B_c):
 
 
 @njit
-def stellar_mass_dependent_threshold(
-    log_halo_mass, log_stellar_mass, a, b, c, b_piv, c_piv
-):
-    """Threshold model with halo-mass and stellar-mass dependence."""
-    return a + b * (log_halo_mass - b_piv) + c * (log_stellar_mass - c_piv)
+def halo_mass_dependent_threshold(log_halo_mass, a, b, b_piv):
+    """Threshold model with halo-mass dependence."""
+    return a + b * (log_halo_mass - b_piv)
 
 
 @njit(
@@ -91,15 +89,11 @@ def update_group_membership_halofinder(
     is_central,
     is_satellite,
     is_red,
-    galaxy_stellar_mass,
     thresh_red_a,
     thresh_red_b,
-    thresh_red_c,
     thresh_blue_a,
     thresh_blue_b,
-    thresh_blue_c,
     b_piv,
-    c_piv,
     omega_matter,
     h,
     active_group_ids,
@@ -123,8 +117,8 @@ def update_group_membership_halofinder(
     - is_central: input boolean array indicating current central galaxies
     - is_satellite: input boolean array indicating current satellite galaxies
     - is_red: boolean array indicating if galaxies are classified as red
-    - thresh_red_a, thresh_red_b, thresh_red_c: Parameters for red galaxy threshold function
-    - thresh_blue_a, thresh_blue_b, thresh_blue_c: Parameters for blue galaxy threshold function
+    - thresh_red_a, thresh_red_b: Parameters for red galaxy threshold function
+    - thresh_blue_a, thresh_blue_b: Parameters for blue galaxy threshold function
     - omega_matter: Matter density parameter at z=0
     - h: Dimensionless Hubble parameter (H0/100)
 
@@ -261,26 +255,19 @@ def update_group_membership_halofinder(
 
             # Assign as satellite if probability exceeds threshold
             log_halo_mass = np.log10(group_halo_mass[group_idx] * 1e14)
-            log_stellar_mass = np.log10(galaxy_stellar_mass[neighbor_idx])
             if is_red[neighbor_idx]:
-                threshold = stellar_mass_dependent_threshold(
+                threshold = halo_mass_dependent_threshold(
                     log_halo_mass,
-                    log_stellar_mass,
                     thresh_red_a,
                     thresh_red_b,
-                    thresh_red_c,
                     b_piv,
-                    c_piv,
                 )
             else:
-                threshold = stellar_mass_dependent_threshold(
+                threshold = halo_mass_dependent_threshold(
                     log_halo_mass,
-                    log_stellar_mass,
                     thresh_blue_a,
                     thresh_blue_b,
-                    thresh_blue_c,
                     b_piv,
-                    c_piv,
                 )
 
             if prob > threshold:
