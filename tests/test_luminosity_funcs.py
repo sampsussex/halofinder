@@ -6,7 +6,7 @@ from cosmo_funcs import (
     absolute_magnitude_limit,
     get_all_comoving_volumes,
 )
-from luminosity_funcs import (
+from luminosity_mass_funcs import (
     simpson_integrate_with_params,
     robotham_11_func,
     luminosity_correction_factor,

@@ -8,9 +8,9 @@ import sys
 
 
 def run_single(config_reader):
-    tinker_finder = RunHaloFinder(config_reader)
-    tinker_finder.run()
-    return tinker_finder
+    halo_finder = RunHaloFinder(config_reader)
+    halo_finder.run()
+    return halo_finder
 
 
 def optimize_on_mock(config_reader):
@@ -42,20 +42,20 @@ def optimize_on_mock(config_reader):
             blue_b,
             blue_c,
         ) = params
-        tinker_finder = RunHaloFinder(config_reader)
-        tinker_finder.red_a_threshold = red_a
-        tinker_finder.red_b_threshold = red_b
-        tinker_finder.red_c_threshold = red_c
-        tinker_finder.blue_a_threshold = blue_a
-        tinker_finder.blue_b_threshold = blue_b
-        tinker_finder.blue_c_threshold = blue_c
+        halo_finder = RunHaloFinder(config_reader)
+        halo_finder.red_a_threshold = red_a
+        halo_finder.red_b_threshold = red_b
+        halo_finder.red_c_threshold = red_c
+        halo_finder.blue_a_threshold = blue_a
+        halo_finder.blue_b_threshold = blue_b
+        halo_finder.blue_c_threshold = blue_c
         print(
             "Optimising params: "
             f"red_a={red_a:.4f}, red_b={red_b:.4f}, red_c={red_c:.4f}, "
             f"blue_a={blue_a:.4f}, blue_b={blue_b:.4f}, blue_c={blue_c:.4f}"
         )
-        tinker_finder.run()
-        return -tinker_finder.s_tot
+        halo_finder.run()
+        return -halo_finder.s_tot
 
     return minimize(
         objective_function, initial_params, bounds=bounds, method="L-BFGS-B"
@@ -99,21 +99,21 @@ def grid_search_on_mock(config_reader, num_points=5):
         for idx, params in enumerate(itertools.product(*grid_axes)):
             if idx >= num_points:
                 break
-            tinker_finder = RunHaloFinder(config_reader)
+            halo_finder = RunHaloFinder(config_reader)
             (
-                tinker_finder.red_a_threshold,
-                tinker_finder.red_b_threshold,
-                tinker_finder.red_c_threshold,
-                tinker_finder.blue_a_threshold,
-                tinker_finder.blue_b_threshold,
-                tinker_finder.blue_c_threshold,
+                halo_finder.red_a_threshold,
+                halo_finder.red_b_threshold,
+                halo_finder.red_c_threshold,
+                halo_finder.blue_a_threshold,
+                halo_finder.blue_b_threshold,
+                halo_finder.blue_c_threshold,
             ) = params
-            tinker_finder.run()
+            halo_finder.run()
             row = ",".join(
                 [
                     str(idx),
                     *[f"{value:.6f}" for value in params],
-                    f"{tinker_finder.s_tot:.6f}",
+                    f"{halo_finder.s_tot:.6f}",
                 ]
             )
             handle.write(f"{row}\n")

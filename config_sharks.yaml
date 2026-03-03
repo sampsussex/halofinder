@@ -39,10 +39,10 @@ file_locations:
 
 
 setup_options:
-  red_a_threshold: 2 # Probability threshold model A term for red galaxies
+  red_a_threshold: 1.6 # Probability threshold model A term for red galaxies
   red_b_threshold: 0.
   red_c_threshold: 0.
-  blue_a_threshold: 2
+  blue_a_threshold: 2.1
   blue_b_threshold: 0.
   blue_c_threshold: 0.
   threshold_b_pivot: 13.0

@@ -469,7 +469,7 @@ def lf_to_hmf_match(group_integral_mag_limits, phi, bins, hmf_masses, dn_dlogM):
 
 
 @njit
-def update_halo_masses(
+def abundance_match_halo_masses(
     abs_mags,
     zs,
     bcg_abs_mags,
@@ -557,3 +557,71 @@ def k_corr(zs):
             k_e += a[i] * ((zspec - z_p) ** i)
         k_corrs[j] = k_e
     return k_corrs
+
+@njit
+def linear_stellar_mass2halo_mass(stellar_masses, intercept, slope):
+    """Simple linear relation between stellar mass and halo mass.
+    Parameters:
+    stellar_masses : array
+        Stellar masses of galaxies in units of h^-1 Msun.
+    intercept : float
+        Intercept of the linear relation in log-log space.
+    slope : float
+        Slope of the linear relation in log-log space.
+    Returns:
+    halo_masses : array
+        Estimated halo masses in units of 10^14 h^-1 Msun.
+    """
+    halo_masses = np.empty_like(stellar_masses)
+    for i in prange(len(stellar_masses)):
+        halo_masses[i] = 10.0 ** (intercept + slope * np.log10(stellar_masses[i])) / 1e14
+    return halo_masses
+
+
+@njit
+def linear_luminosity2halo_mass(luminosities, intercept, slope):
+    """Simple linear relation between luminosity and halo mass.
+    Parameters:
+    luminosities : array
+        Luminosities of galaxies in units of h^-1 L_sun.
+        intercept : float
+        Intercept of the linear relation in log-log space.
+        slope : float
+        Slope of the linear relation in log-log space.
+        Returns:
+        halo_masses : array
+        Estimated halo masses in units of 10^14 h^-1 Msun.
+    """
+    halo_masses = np.empty_like(luminosities)
+    for i in prange(len(luminosities)):
+        halo_masses[i] = 10.0 ** (intercept + slope * np.log10(luminosities[i])) / 1e14
+    return halo_masses
+
+
+@njit
+def red_blue_linear_luminosity2halo_mass(luminosities, central_is_red, intercept_red, slope_red, intercept_blue, slope_blue):
+    """Separate linear relations for red and blue centrals.
+    Parameters:
+    luminosities : array
+        Luminosities of galaxies in units of h^-1 L_sun.
+        central_is_red : array
+        Boolean array indicating if each galaxy is a red central.
+        intercept_red : float
+        Intercept for red centrals in log-log space.
+        slope_red : float
+        Slope for red centrals in log-log space.
+        intercept_blue : float
+        Intercept for blue centrals in log-log space.
+        slope_blue : float
+        Slope for blue centrals in log-log space.
+        Returns:
+        halo_masses : array
+        Estimated halo masses in units of 10^14 h^-1 Msun.
+    """
+    halo_masses = np.empty_like(luminosities)
+    for i in prange(len(luminosities)):
+        if central_is_red[i]:
+            halo_masses[i] = 10.0 ** (intercept_red + slope_red * np.log10(luminosities[i])) / 1e14
+        else:
+            halo_masses[i] = 10.0 ** (intercept_blue + slope_blue * np.log10(luminosities[i])) / 1e14
+    return halo_masses

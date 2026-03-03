@@ -1,6 +1,6 @@
 import numpy as np
 from numba import njit, prange
-from luminosity_funcs import luminosity_correction_factor
+from luminosity_mass_funcs import luminosity_correction_factor
 
 
 @njit
