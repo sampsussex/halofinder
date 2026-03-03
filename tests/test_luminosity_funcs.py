@@ -1,8 +1,12 @@
 import pytest
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
-from cosmo_funcs import distance_modulus, absolute_magnitude_limit, get_all_comoving_volumes
-from luminosity_funcs import (
+from cosmo_funcs import (
+    distance_modulus,
+    absolute_magnitude_limit,
+    get_all_comoving_volumes,
+)
+from luminosity_mass_funcs import (
     simpson_integrate_with_params,
     robotham_11_func,
     luminosity_correction_factor,
@@ -16,11 +20,12 @@ from luminosity_funcs import (
     cumulative_hmf,
     match_hmf_single,
     lf_to_hmf_match,
-    update_halo_masses
+    update_halo_masses,
 )
 
 # Cosmology setup
 cosmo_astropy = FlatLambdaCDM(H0=70, Om0=0.3)
+
 
 def test_robotham_11_func_consistency():
     phi_star, M_star, alpha = 0.01, -20, -1
@@ -28,22 +33,28 @@ def test_robotham_11_func_consistency():
     val = robotham_11_func(M, phi_star, M_star, alpha)
     assert val > 0
 
+
 def test_simpson_integrate_with_params_simple():
     phi_star, M_star, alpha = 0.01, -20, -1
     result = simpson_integrate_with_params(-25, -15, phi_star, M_star, alpha)
     assert result > 0
 
+
 def test_luminosity_correction_factor_consistency():
     m_lim, z = 20, 0.1
     phi_star, M_star, alpha = 0.01, -20, -1
     omega_matter, h = 0.3, 0.7
-    val = luminosity_correction_factor(m_lim, z, phi_star, M_star, alpha, omega_matter, h)
+    val = luminosity_correction_factor(
+        m_lim, z, phi_star, M_star, alpha, omega_matter, h
+    )
     assert val > 0
+
 
 def test_generate_hmf_shapes():
     hmf_m, dn_dlogM = generate_hmf(0.1, 10, 15, 0.1, 0.7, 0.3)
     assert hmf_m.shape == dn_dlogM.shape
     assert np.all(dn_dlogM >= 0)
+
 
 def test_ddm_bisection_and_get_zlims():
     abs_mag_val = -20
@@ -59,7 +70,9 @@ def test_ddm_bisection_and_get_zlims():
 
     # Test bisection finds correct redshift
     z_lo, z_hi = 0.01, 1.0
-    z_root = bisection_ddm(z_lo, z_hi, abs_mag_val, k_corr_val, survey_mag_lim, omega_matter, h)
+    z_root = bisection_ddm(
+        z_lo, z_hi, abs_mag_val, k_corr_val, survey_mag_lim, omega_matter, h
+    )
     # The apparent magnitude at z_root should be close to survey limit
     m_app = abs_mag_val + distance_modulus(z_root, omega_matter, h) + k_corr_val
     np.testing.assert_allclose(m_app, survey_mag_lim, rtol=1e-3)
@@ -75,11 +88,13 @@ def test_ddm_bisection_and_get_zlims():
         m_app_i = abs_mags[i] + distance_modulus(zlims[i], omega_matter, h) + k_corrs[i]
         assert m_app_i <= survey_mag_lim + 1e-3  # allow small tolerance
 
+
 def test_histogram_numba_basic():
     x = np.array([0.1, 0.5, 1.2, 1.8])
     bins = np.array([0, 1, 2])
     counts = histogram_numba(x, bins)
     np.testing.assert_array_equal(counts, np.array([2, 2]))
+
 
 def test_integrate_lf_basic():
     bins = np.array([-21, -20, -19])
@@ -87,11 +102,13 @@ def test_integrate_lf_basic():
     n = integrate_lf(phi, bins, -20.5)
     assert n > 0
 
+
 def test_cumulative_hmf_basic():
     masses = np.array([1, 2, 3, 4])
     dn = np.array([1, 2, 3, 4])
     n_cum = cumulative_hmf(masses, dn)
     assert n_cum[0] > n_cum[-1]
+
 
 def test_match_hmf_single_basic():
     masses = np.array([1, 2, 3, 4])
@@ -100,22 +117,25 @@ def test_match_hmf_single_basic():
     M_thresh = match_hmf_single(n_target, masses, dn)
     assert M_thresh >= masses[0] and M_thresh <= masses[-1]
 
+
 # Setup a simple cosmology
 cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+
 
 @pytest.fixture
 def mock_galaxies_and_hmf():
     # Mock galaxy catalogue
     galaxies = {
         "abs_mag": np.array([-21, -20, -19, -18]),
-        "z": np.array([0.05, 0.1, 0.2, 0.3])
+        "z": np.array([0.05, 0.1, 0.2, 0.3]),
     }
     # Mock halo mass function
     hmf = {
-        "logM": np.array([11, 12, 13, 14]),        # log10 halo mass
-        "dn_dlogM": np.array([1e-3, 1e-4, 1e-5, 1e-6])  # dn/dlogM
+        "logM": np.array([11, 12, 13, 14]),  # log10 halo mass
+        "dn_dlogM": np.array([1e-3, 1e-4, 1e-5, 1e-6]),  # dn/dlogM
     }
     return galaxies, hmf
+
 
 def test_lf_to_hmf_match_shapes_and_order():
     integral_mag_limits = np.array([-22, -21, -20])
@@ -128,6 +148,7 @@ def test_lf_to_hmf_match_shapes_and_order():
     assert halo_masses.shape == integral_mag_limits.shape
     # check monotonicity
     assert np.all(np.diff(halo_masses) >= 0)
+
 
 def test_lf_to_hmf_match_respects_z_limits():
     # use mags outside typical range to simulate "z limits" behavior
@@ -142,7 +163,6 @@ def test_lf_to_hmf_match_respects_z_limits():
     assert np.all(np.isfinite(halo_masses))
 
 
-
 def test_update_halo_masses_runs_numpy():
     abs_mags = np.array([-22, -21])
     zs = np.array([0.1, 0.2])
@@ -154,9 +174,16 @@ def test_update_halo_masses_runs_numpy():
     omega_matter = 0.3
     h = 0.7
 
-    masses = update_halo_masses(abs_mags, zs, k_corrs,
-                                survey_mag_limit, survey_fractional_area,
-                                hmf_masses, dn_dlogM,
-                                omega_matter, h)
+    masses = update_halo_masses(
+        abs_mags,
+        zs,
+        k_corrs,
+        survey_mag_limit,
+        survey_fractional_area,
+        hmf_masses,
+        dn_dlogM,
+        omega_matter,
+        h,
+    )
 
     assert masses.shape == abs_mags.shape

@@ -5,8 +5,13 @@ from hmf import MassFunction
 from hmf import cosmo
 from astropy.cosmology import FlatLambdaCDM
 import logging
-from numba import njit
-from cosmo_funcs import distance_modulus, get_all_comoving_volumes, absolute_magnitude_limit
+from numba import njit, prange
+from cosmo_funcs import (
+    distance_modulus,
+    get_all_comoving_volumes,
+    absolute_magnitude_limit,
+)
+
 
 @njit
 def simpson_integrate_with_params(a, b, phi_star, M_star, alpha, n=1000):
@@ -29,7 +34,14 @@ def simpson_integrate_with_params(a, b, phi_star, M_star, alpha, n=1000):
 @njit
 def robotham_11_func(M, phi_star, M_star, alpha):
     """Fixed numba function with proper parameters"""
-    return 10**(-0.4*M) * 0.4*np.log(10)*phi_star*(10**(0.4*(M_star-M)))**(alpha+1)*np.exp(-10**(0.4*(M_star-M)))
+    return (
+        10 ** (-0.4 * M)
+        * 0.4
+        * np.log(10)
+        * phi_star
+        * (10 ** (0.4 * (M_star - M))) ** (alpha + 1)
+        * np.exp(-(10 ** (0.4 * (M_star - M))))
+    )
 
 
 @njit
@@ -47,16 +59,18 @@ def luminosity_correction_factor(m_lim, z, phi_star, M_star, alpha, omega_matter
         float: Luminosity correction factor"""
 
     lf_M_lim = absolute_magnitude_limit(z, m_lim, omega_matter, h)
-    
+
     # Use Simpson's rule integration with parameters passed directly
-    int_lf_total = simpson_integrate_with_params(-30., -14., phi_star, M_star, alpha)
-    int_lf_to_lim = simpson_integrate_with_params(-30., lf_M_lim, phi_star, M_star, alpha)
-    
+    int_lf_total = simpson_integrate_with_params(-30.0, -14.0, phi_star, M_star, alpha)
+    int_lf_to_lim = simpson_integrate_with_params(
+        -30.0, lf_M_lim, phi_star, M_star, alpha
+    )
+
     return 1.04 * int_lf_total / int_lf_to_lim
 
 
 def generate_hmf(hmf_z, m_min, m_max, dlog10m, h, omega_matter):
-    """ Generate the halo mass function at a given redshift.
+    """Generate the halo mass function at a given redshift.
     Parameters:
         hmf_z (float): Redshift at which to compute the HMF
         m_min (float): Minimum halo mass in log10(Msun/h)
@@ -65,11 +79,12 @@ def generate_hmf(hmf_z, m_min, m_max, dlog10m, h, omega_matter):
         h (float): Dimensionless Hubble parameter
         omega_matter (float): Matter density parameter
     Returns:
-        tuple: (halo_masses, dn_dlogM) where halo_masses is an array of log10 halo masses and dn_dlogM is the differential number density
+        tuple: (halo_masses, dn_dlogM) where halo_masses is an array of
+            log10 halo masses and dn_dlogM is the differential number density
     """
 
     astropy_cosmo = FlatLambdaCDM(H0=h * 100, Om0=omega_matter)
-    hmf_cosmo = cosmo.Cosmology(cosmo_model = astropy_cosmo )
+    hmf_cosmo = cosmo.Cosmology(cosmo_model=astropy_cosmo)
     mf = MassFunction(z=hmf_z, Mmin=m_min, Mmax=m_max, dlog10m=dlog10m)
     return mf.m, mf.dndlog10m
 
@@ -102,7 +117,17 @@ def ddm(z, abs_mag_val, k_corr, survey_mag_lim, omega_matter, h):
 
 
 @njit
-def bisection_ddm(z_lo, z_hi, abs_mag_val, k_corr_val, survey_mag_lim, omega_matter, h, tol=1e-5, maxiter=100):
+def bisection_ddm(
+    z_lo,
+    z_hi,
+    abs_mag_val,
+    k_corr_val,
+    survey_mag_lim,
+    omega_matter,
+    h,
+    tol=1e-5,
+    maxiter=100,
+):
     """
     Simple bisection method to solve ddm(z) = 0 between [z_lo, z_hi].
     Parameters
@@ -191,7 +216,9 @@ def get_zlims(zs, abs_mags, k_corrs, z_max, survey_mag_lim, omega_matter, h):
             zlim[i] = z_max
         else:
             # Root should lie in [0, z_max] (if it exists)
-            z_root = bisection_ddm(0.0, z_max, abs_val, k_val, survey_mag_lim, omega_matter, h)
+            z_root = bisection_ddm(
+                0.0, z_max, abs_val, k_val, survey_mag_lim, omega_matter, h
+            )
             if np.isnan(z_root):
                 # If no root, safest is zlim=zs (gives minimal vmax, avoids crushing phi)
                 zlim[i] = zs[i]
@@ -238,12 +265,18 @@ def histogram_numba(x, bins, weights=None):
     return counts
 
 
-
-
-
 @njit
-def generate_empircal_lf(group_abs_mags, group_zs,  bcg_abs_mags, bcg_k_corrs, survey_mag_lim, survey_area_fraction, omega_matter, h):
-    """ Generate empirical luminosity function using 1/Vmax method.
+def generate_empircal_lf(
+    group_abs_mags,
+    group_zs,
+    bcg_abs_mags,
+    bcg_k_corrs,
+    survey_mag_lim,
+    survey_area_fraction,
+    omega_matter,
+    h,
+):
+    """Generate empirical luminosity function using 1/Vmax method.
     Parameters
     ----------
     group_abs_mags : array
@@ -273,17 +306,19 @@ def generate_empircal_lf(group_abs_mags, group_zs,  bcg_abs_mags, bcg_k_corrs, s
     abs_mag_min = np.min(group_abs_mags)
     z_max = np.max(group_zs)
 
-    zlims = get_zlims(group_zs, bcg_abs_mags, bcg_k_corrs, z_max, survey_mag_lim, omega_matter, h) #zs, abs_mags, k_corrs, z_max, survey_mag_lim
+    zlims = get_zlims(
+        group_zs, bcg_abs_mags, bcg_k_corrs, z_max, survey_mag_lim, omega_matter, h
+    )  # zs, abs_mags, k_corrs, z_max, survey_mag_lim
 
-    #vs = survey_area_fraction * get_all_comoving_volumes(zs, omega_matter)
+    # vs = survey_area_fraction * get_all_comoving_volumes(zs, omega_matter)
 
     vmaxs = survey_area_fraction * get_all_comoving_volumes(zlims, omega_matter)
 
-    #v_vmaxs = vs / vmaxs
+    # v_vmaxs = vs / vmaxs
 
     bins = np.linspace(abs_mag_min, abs_mag_max, 50)
 
-    phi = histogram_numba(group_abs_mags, bins=bins, weights= 1.0 / vmaxs)
+    phi = histogram_numba(group_abs_mags, bins=bins, weights=1.0 / vmaxs)
     return phi, bins
 
 
@@ -380,31 +415,32 @@ def match_hmf_single(n_target, hmf_masses, dn_dlogM):
     logM = np.log10(hmf_masses)
 
     # If outside range, clamp instead of always max-mass
-    n_hi = n_cum[0]          # at low mass
-    n_lo = n_cum[-2]         # last non-zero-ish (since last is 0)
+    n_hi = n_cum[0]  # at low mass
+    n_lo = n_cum[-2]  # last non-zero-ish (since last is 0)
     if n_target >= n_hi:
-        return hmf_masses[0]     # very abundant -> low mass
+        return hmf_masses[0]  # very abundant -> low mass
     if n_target <= n_lo:
-        return hmf_masses[-1]    # very rare -> high mass
+        return hmf_masses[-1]  # very rare -> high mass
 
     for i in range(len(hmf_masses) - 1):
         n1, n2 = n_cum[i], n_cum[i + 1]
         if (n1 >= n_target >= n2) or (n1 <= n_target <= n2):
             frac = (n_target - n1) / (n2 - n1)
             logM_thresh = logM[i] + frac * (logM[i + 1] - logM[i])
-            return 10.0 ** logM_thresh
+            return 10.0**logM_thresh
 
     return hmf_masses[-1]
 
 
-@njit
-def lf_to_hmf_match(integral_mag_limits, phi, bins, hmf_masses, dn_dlogM):
+@njit(parallel=True)
+def lf_to_hmf_match(group_integral_mag_limits, phi, bins, hmf_masses, dn_dlogM):
     """
     Wrapper: for array of mag_limits, return array of halo mass thresholds.
     Parameters
     ----------
-    integral_mag_limits : array
+    group_integral_mag_limits : array
         Array of absolute magnitude limits for integration.
+
     phi : array
         Luminosity function values in each magnitude bin.
     bins : array
@@ -413,20 +449,41 @@ def lf_to_hmf_match(integral_mag_limits, phi, bins, hmf_masses, dn_dlogM):
         Halo masses in h^-1 Msun.
     dn_dlogM : array
         Differential HMF dn/dlogM in h^3 Mpc^-3.
+
+
     Returns
     -------
     halo_masses : array
 
         Array of halo mass thresholds in h^-1 Msun corresponding to each integral_mag_limit.
     """
-    halo_masses = np.empty(len(integral_mag_limits))
-    for j in range(len(integral_mag_limits)):
-        n = integrate_lf(phi, bins, integral_mag_limits[j])
-        halo_masses[j] = match_hmf_single(n, hmf_masses, dn_dlogM)
+
+    halo_masses = np.empty(len(group_integral_mag_limits))
+
+    for i in prange(len(group_integral_mag_limits)):
+        halo_masses[i] = match_hmf_single(
+            integrate_lf(phi, bins, group_integral_mag_limits[i]), hmf_masses, dn_dlogM
+        )
+
     return halo_masses
 
+
 @njit
-def update_halo_masses(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, survey_mag_limit, survey_fractional_area, hmf_masses, dn_dlogM, omega_matter, h):
+def abundance_match_halo_masses(
+    abs_mags,
+    zs,
+    bcg_abs_mags,
+    bcg_k_corrs,
+    bcg_is_red,
+    survey_mag_limit,
+    survey_fractional_area,
+    hmf_masses,
+    dn_dlogM,
+    omega_matter,
+    h,
+    red_mag_boost_a,
+    red_mag_boost_b,
+):
     """
     Main function to update halo masses based on luminosity function matching.
     Parameters
@@ -456,15 +513,36 @@ def update_halo_masses(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, survey_mag_limit
     matched_masses : array
         Array of halo mass thresholds in 10^14 h^-1 Msun corresponding to each galaxy.
     """
-    phi, bins = generate_empircal_lf(abs_mags, zs, bcg_abs_mags, bcg_k_corrs, survey_mag_limit, survey_fractional_area, omega_matter, h)
+    boosted_abs_mags = np.empty_like(bcg_abs_mags)
+    for i in range(len(bcg_abs_mags)):
+        if bcg_is_red[i]:
+            boosted_abs_mags[i] = abs_mags[i] - (
+                red_mag_boost_a + red_mag_boost_b * (abs_mags[i] + 20.0)
+            )
+        else:
+            boosted_abs_mags[i] = abs_mags[i]
 
-    matched_masses = lf_to_hmf_match(abs_mags, phi, bins, hmf_masses, dn_dlogM)
+    phi, bins = generate_empircal_lf(
+        boosted_abs_mags,
+        zs,
+        bcg_abs_mags,
+        bcg_k_corrs,
+        survey_mag_limit,
+        survey_fractional_area,
+        omega_matter,
+        h,
+    )
 
-    return matched_masses / 1e14  # convert to 10^14 h^-1 Msun for consistency with other code
+    matched_masses = lf_to_hmf_match(boosted_abs_mags, phi, bins, hmf_masses, dn_dlogM)
+
+    return (
+        matched_masses / 1e14
+    )  # convert to 10^14 h^-1 Msun for consistency with other code
 
 
 @njit
 def k_corr(zs):
+    # K-correction from Robotham+11
     z_ref = 0
     Q_z_ref = 1.75
     z_p = 0.2
@@ -474,8 +552,76 @@ def k_corr(zs):
     k_corrs = np.zeros(len(zs))
     for j in range(len(zs)):
         zspec = zs[j]
-        k_e = Q_z_ref*(zspec-z_ref)
-        for i in range(N+1):
-            k_e += a[i]*((zspec-z_p)**i)
+        k_e = Q_z_ref * (zspec - z_ref)
+        for i in range(N + 1):
+            k_e += a[i] * ((zspec - z_p) ** i)
         k_corrs[j] = k_e
     return k_corrs
+
+@njit
+def linear_stellar_mass2halo_mass(stellar_masses, intercept, slope):
+    """Simple linear relation between stellar mass and halo mass.
+    Parameters:
+    stellar_masses : array
+        Stellar masses of galaxies in units of h^-1 Msun.
+    intercept : float
+        Intercept of the linear relation in log-log space.
+    slope : float
+        Slope of the linear relation in log-log space.
+    Returns:
+    halo_masses : array
+        Estimated halo masses in units of 10^14 h^-1 Msun.
+    """
+    halo_masses = np.empty_like(stellar_masses)
+    for i in prange(len(stellar_masses)):
+        halo_masses[i] = 10.0 ** (intercept + slope * np.log10(stellar_masses[i])) / 1e14
+    return halo_masses
+
+
+@njit
+def linear_luminosity2halo_mass(luminosities, intercept, slope):
+    """Simple linear relation between luminosity and halo mass.
+    Parameters:
+    luminosities : array
+        Luminosities of galaxies in units of h^-1 L_sun.
+        intercept : float
+        Intercept of the linear relation in log-log space.
+        slope : float
+        Slope of the linear relation in log-log space.
+        Returns:
+        halo_masses : array
+        Estimated halo masses in units of 10^14 h^-1 Msun.
+    """
+    halo_masses = np.empty_like(luminosities)
+    for i in prange(len(luminosities)):
+        halo_masses[i] = 10.0 ** (intercept + slope * np.log10(luminosities[i]*1e14)) / 1e14
+    return halo_masses
+
+
+@njit
+def red_blue_linear_luminosity2halo_mass(luminosities, central_is_red, intercept_red, slope_red, intercept_blue, slope_blue):
+    """Separate linear relations for red and blue centrals.
+    Parameters:
+    luminosities : array
+        Luminosities of galaxies in units of h^-1 L_sun.
+        central_is_red : array
+        Boolean array indicating if each galaxy is a red central.
+        intercept_red : float
+        Intercept for red centrals in log-log space.
+        slope_red : float
+        Slope for red centrals in log-log space.
+        intercept_blue : float
+        Intercept for blue centrals in log-log space.
+        slope_blue : float
+        Slope for blue centrals in log-log space.
+        Returns:
+        halo_masses : array
+        Estimated halo masses in units of 10^14 h^-1 Msun.
+    """
+    halo_masses = np.empty_like(luminosities)
+    for i in prange(len(luminosities)):
+        if central_is_red[i]:
+            halo_masses[i] = 10.0 ** (intercept_red + slope_red * np.log10(luminosities[i] * 1e14)) / 1e14
+        else:
+            halo_masses[i] = 10.0 ** (intercept_blue + slope_blue * np.log10(luminosities[i] * 1e14)) / 1e14
+    return halo_masses
