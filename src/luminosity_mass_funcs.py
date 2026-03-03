@@ -594,7 +594,7 @@ def linear_luminosity2halo_mass(luminosities, intercept, slope):
     """
     halo_masses = np.empty_like(luminosities)
     for i in prange(len(luminosities)):
-        halo_masses[i] = 10.0 ** (intercept + slope * np.log10(luminosities[i])) / 1e14
+        halo_masses[i] = 10.0 ** (intercept + slope * np.log10(luminosities[i]*1e14)) / 1e14
     return halo_masses
 
 
@@ -621,7 +621,7 @@ def red_blue_linear_luminosity2halo_mass(luminosities, central_is_red, intercept
     halo_masses = np.empty_like(luminosities)
     for i in prange(len(luminosities)):
         if central_is_red[i]:
-            halo_masses[i] = 10.0 ** (intercept_red + slope_red * np.log10(luminosities[i])) / 1e14
+            halo_masses[i] = 10.0 ** (intercept_red + slope_red * np.log10(luminosities[i] * 1e14)) / 1e14
         else:
-            halo_masses[i] = 10.0 ** (intercept_blue + slope_blue * np.log10(luminosities[i])) / 1e14
+            halo_masses[i] = 10.0 ** (intercept_blue + slope_blue * np.log10(luminosities[i] * 1e14)) / 1e14
     return halo_masses

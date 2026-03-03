@@ -5,8 +5,8 @@ run_options:
   run_mock_comparison: True  # Set to true to compare score to mock
   optimse_on_mock: False # Set to true to optimse the group finder parameters based on mock comparison
   optimse_parameter_space: False # Set to true to grid search parameter space based on mock comparison
-  make_plots: False # Set to false to skip generating plots
-  mode: "shmr" # Mass assignment mode: abundance_match, shmr, or lhmr
+  make_plots: True # Set to false to skip generating plots
+  mode: "lhmr" # Mass assignment mode: abundance_match, shmr, or lhmr
   
 
 cosmology:
@@ -49,8 +49,8 @@ setup_options:
   threshold_c_pivot: 10.0
   shmr_slope: 1.21
   shmr_intercept: -0.55
-  lhmr_slope: 1.21
-  lhmr_intercept: -0.55
+  lhmr_slope: 1.465
+  lhmr_intercept: -3.501
   survey_magnitude_limit: 21.25  # Magnitude limit for the survey
   abs_solar_magnitude_in_band: 4.51  # Absolute solar magnitude
   max_iterations: 5  # Maximum number of iterations for the group finder

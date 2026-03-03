@@ -451,13 +451,14 @@ class HaloFinder:
 
 
         elif self.mass_assignment_mode == 'lhmr':
-            self.group_halo_masses = linear_luminosity2halo_mass(self.group_luminosities, self.lhmr_slope, self.lhmr_intercept)
+            self.group_halo_masses = linear_luminosity2halo_mass(self.group_luminosities, self.lhmr_intercept, self.lhmr_slope)
 
         elif self.mass_assignment_mode == 'red_blue_lhmr':
             self.group_halo_masses = red_blue_linear_luminosity2halo_mass(self.group_luminosities, 
-                                                                          self.group_bcg_is_red, 
-                                                                          self.lhmr_slope_red, 
-                                                                          self.lhmr_intercept_red, 
+                                                                          self.group_bcg_is_red,
+                                                                          self.lhmr_intercept_red,
+                                                                          self.lhmr_slope_red,
+                                                                          self.lhmr_intercept_blue, 
                                                                           self.lhmr_slope_blue, 
                                                                           self.lhmr_intercept_blue)
         elif self.mass_assignment_mode == "abundance_match":
@@ -487,7 +488,7 @@ class HaloFinder:
 
     def apply_halo_finder(self):
         logging.info("Performing iteration of group finder")
-        if self.mode == "shmr" or self.mode == "lhmr" or self.mode == "red_blue_lhmr":
+        if self.mass_assignment_mode == "shmr" or self.mass_assignment_mode == "lhmr" or self.mass_assignment_mode == "red_blue_lhmr":
             use_active_groups = self.active_group_ids is not None
             if use_active_groups:
                 logging.info(
