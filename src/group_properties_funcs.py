@@ -15,11 +15,11 @@ from typing import Optional, Sequence, Tuple, List
 
 @njit
 def find_all_initial_mass_to_light(group_luminosity, mass_light_gain):
-    """Calculate initial halo masses based on group luminosity and mass-light gain factor."""
-    # placeholder, using intitaly 500 value
+    """Calculate initial halo masses in log10(Msun/h) from group luminosity and M/L gain."""
     halo_masses = np.zeros(len(group_luminosity))
     for i in range(len(group_luminosity)):
-        halo_masses[i] = mass_light_gain * group_luminosity[i]
+        mass = mass_light_gain * group_luminosity[i] * 1e14
+        halo_masses[i] = np.log10(mass) if mass > 0.0 else np.nan
     return halo_masses
 
 
@@ -667,7 +667,7 @@ def calculate_velocity_disp_corr_mass(
 def dynamical_mass(gapper_velocity_dispersion, r50, A):
     G_MSOL_MPC_KMS2 = 4.302e-9 #Mpc (km/s)^2 / M_sun
     raw_mass = (r50 * (gapper_velocity_dispersion**2)) / G_MSOL_MPC_KMS2 if np.isfinite(r50) else np.nan
-    return A * raw_mass / 1e14 if np.isfinite(raw_mass) else np.nan
+    return np.log10(A * raw_mass) if np.isfinite(raw_mass) and (A * raw_mass) > 0.0 else np.nan
 
 
 @njit
@@ -692,7 +692,7 @@ def fit_log_luminosity_log_mass_relation(group_luminosities, group_dynamical_mas
     for i in range(n):
         if group_sizes[i] >= min_group_members and group_luminosities[i] > 0.0 and group_dynamical_masses[i] > 0.0:
             x[j] = np.log10(group_luminosities[i] * 1e14)
-            y[j] = np.log10(group_dynamical_masses[i] * 1e14)
+            y[j] = group_dynamical_masses[i]
             j += 1
 
     mean_x = 0.0
