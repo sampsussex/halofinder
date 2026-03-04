@@ -14,12 +14,12 @@ def run_single(config_reader):
 
 
 def optimize_on_mock(config_reader):
-    setup_options = config_reader.get_setup_options()
+    threshold_options = config_reader.get_threshold_model_params()
     initial_params = [
-        setup_options["red_a_threshold"],
-        setup_options["red_b_threshold"],
-        setup_options["blue_a_threshold"],
-        setup_options["blue_b_threshold"],
+        threshold_options["red_a_threshold"],
+        threshold_options["red_b_threshold"],
+        threshold_options["blue_a_threshold"],
+        threshold_options["blue_b_threshold"],
     ]
 
     bounds = [

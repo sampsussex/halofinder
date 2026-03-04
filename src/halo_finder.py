@@ -14,6 +14,8 @@ from group_properties_funcs import (
     find_all_initial_mass_to_light,
     brightest_galaxy_centers,
     brightest_galaxy_centers_fast,
+    calculate_group_dynamical_masses,
+    fit_log_luminosity_log_mass_relation,
 )
 from luminosity_mass_funcs import (
     k_corr,
@@ -90,24 +92,37 @@ class HaloFinder:
         self.survey_fractional_area = config_reader.get_survey_fractional_area()
 
         # Get setup options from config
-        setup_options = config_reader.get_setup_options()
-        self.max_iterations = setup_options["max_iterations"]
-        self.mag_limit = setup_options["survey_magnitude_limit"]
-        self.abs_mag_sun = setup_options["abs_solar_magnitude_in_band"]
-        self.remove_isolated_galaxies = setup_options["remove_isolated_galaxies"]
-        self.red_a_threshold = setup_options["red_a_threshold"]
-        self.red_b_threshold = setup_options["red_b_threshold"]
-        self.blue_a_threshold = setup_options["blue_a_threshold"]
-        self.blue_b_threshold = setup_options["blue_b_threshold"]
-        self.threshold_b_pivot = setup_options["threshold_b_pivot"]
-        self.shmr_slope = setup_options["shmr_slope"]
-        self.shmr_intercept = setup_options["shmr_intercept"]
-        self.lhmr_slope = setup_options["lhmr_slope"]
-        self.lhmr_intercept = setup_options["lhmr_intercept"]
-        self.lhmr_slope_red = setup_options["lhmr_slope_red"]
-        self.lhmr_intercept_red = setup_options["lhmr_intercept_red"]
-        self.lhmr_slope_blue = setup_options["lhmr_slope_blue"]
-        self.lhmr_intercept_blue = setup_options["lhmr_intercept_blue"]
+        finder_options = config_reader.get_finder_options()
+        threshold_options = config_reader.get_threshold_model_params()
+        shmr_params = config_reader.get_shmr_params()
+        lhmr_params = config_reader.get_lhmr_params()
+        red_blue_lhmr_params = config_reader.get_red_blue_lhmr_params()
+        lhmr_dynamical_params = config_reader.get_lhmr_dynamical_calibrated_params()
+
+        self.max_iterations = finder_options["max_iterations"]
+        self.mag_limit = finder_options["survey_magnitude_limit"]
+        self.abs_mag_sun = finder_options["abs_solar_magnitude_in_band"]
+        self.remove_isolated_galaxies = finder_options["remove_isolated_galaxies"]
+
+        self.red_a_threshold = threshold_options["red_a_threshold"]
+        self.red_b_threshold = threshold_options["red_b_threshold"]
+        self.blue_a_threshold = threshold_options["blue_a_threshold"]
+        self.blue_b_threshold = threshold_options["blue_b_threshold"]
+        self.threshold_b_pivot = threshold_options["threshold_b_pivot"]
+
+        self.shmr_slope = shmr_params["shmr_slope"]
+        self.shmr_intercept = shmr_params["shmr_intercept"]
+        self.lhmr_slope = lhmr_params["lhmr_slope"]
+        self.lhmr_intercept = lhmr_params["lhmr_intercept"]
+        self.lhmr_slope_red = red_blue_lhmr_params["lhmr_slope_red"]
+        self.lhmr_intercept_red = red_blue_lhmr_params["lhmr_intercept_red"]
+        self.lhmr_slope_blue = red_blue_lhmr_params["lhmr_slope_blue"]
+        self.lhmr_intercept_blue = red_blue_lhmr_params["lhmr_intercept_blue"]
+
+        self.lhmr_dyn_A = lhmr_dynamical_params.get("A", 1.0)
+        self.lhmr_dyn_min_group_members = lhmr_dynamical_params.get("min_group_members", 5)
+        self.lhmr_dyn_current_slope = self.lhmr_slope
+        self.lhmr_dyn_current_intercept = self.lhmr_intercept
 
         # self.b_threshold = setup_options.get('b_threshold', 0.0)
 
@@ -461,6 +476,16 @@ class HaloFinder:
         elif self.mass_assignment_mode == 'lhmr':
             self.group_halo_masses = linear_luminosity2halo_mass(self.group_luminosities, self.lhmr_intercept, self.lhmr_slope)
 
+        elif self.mass_assignment_mode == 'lhmr_dynamical_calibrated':
+            if self.iteration_counter == 0:
+                self.group_halo_masses = find_all_initial_mass_to_light(self.group_luminosities, 500.0)
+            else:
+                self.group_halo_masses = linear_luminosity2halo_mass(
+                    self.group_luminosities,
+                    self.lhmr_dyn_current_intercept,
+                    self.lhmr_dyn_current_slope,
+                )
+
         elif self.mass_assignment_mode == 'red_blue_lhmr':
             self.group_halo_masses = red_blue_linear_luminosity2halo_mass(
                 self.group_luminosities,
@@ -495,7 +520,7 @@ class HaloFinder:
 
     def apply_halo_finder(self):
         logging.info("Performing iteration of group finder")
-        if self.mass_assignment_mode == "shmr" or self.mass_assignment_mode == "lhmr" or self.mass_assignment_mode == "red_blue_lhmr":
+        if self.mass_assignment_mode in ("shmr", "lhmr", "red_blue_lhmr", "lhmr_dynamical_calibrated"):
             use_active_groups = self.active_group_ids is not None
             if use_active_groups:
                 logging.info(
@@ -542,6 +567,40 @@ class HaloFinder:
             f"Groupfinder iteration complete, number of groups found: {len(np.unique(self.new_members))}"
         )
 
+    def update_lhmr_dynamical_calibration(self):
+        if self.mass_assignment_mode != "lhmr_dynamical_calibrated":
+            return
+
+        group_dynamical_masses = calculate_group_dynamical_masses(
+            self.group_ids,
+            self.unique_groups,
+            self.zobs,
+            self.group_sizes,
+            self.lhmr_dyn_A,
+        )
+
+        slope, intercept, n_used = fit_log_luminosity_log_mass_relation(
+            self.group_luminosities,
+            group_dynamical_masses,
+            self.group_sizes,
+            self.lhmr_dyn_min_group_members,
+        )
+
+        if np.isfinite(slope) and np.isfinite(intercept):
+            self.lhmr_dyn_current_slope = slope
+            self.lhmr_dyn_current_intercept = intercept
+            logging.info(
+                "Updated dynamical LHMR calibration using %d groups: slope=%.4f intercept=%.4f",
+                n_used,
+                slope,
+                intercept,
+            )
+        else:
+            logging.warning(
+                "Could not update dynamical LHMR calibration (valid groups=%d); retaining previous slope/intercept",
+                n_used,
+            )
+
     def save_galaxy_groups(self):
         logging.info(f"Saving galaxy groups at the location: {self.save_path}")
         header = "id_galaxy_sky\tid_finder_group"
@@ -579,6 +638,7 @@ class HaloFinder:
                 )
                 self.group_ids = self.new_members.copy()
                 self.update_group_luminosity_and_centres()
+                self.update_lhmr_dynamical_calibration()
                 self.update_group_halo_masses()
                 self.debugging_plots()
                 logging.info(f"Iteration number : {self.iteration_counter} complete")
@@ -705,6 +765,8 @@ class RunHaloFinder(HaloFinder):
         self.initial_group_central_satellite_assignment()
         self.initial_luminosities()
         self.update_group_luminosity_and_centres()
+        self.lhmr_dyn_current_slope = self.lhmr_slope
+        self.lhmr_dyn_current_intercept = self.lhmr_intercept
         self.update_group_halo_masses()
         logging.info(f"Tunable parameters for this run:")
         logging.info(f"Red a threshold: {self.red_a_threshold}")
@@ -724,6 +786,8 @@ class RunHaloFinder(HaloFinder):
         self.initial_group_central_satellite_assignment()
         self.initial_luminosities()
         self.update_group_luminosity_and_centres()
+        self.lhmr_dyn_current_slope = self.lhmr_slope
+        self.lhmr_dyn_current_intercept = self.lhmr_intercept
         self.update_group_halo_masses()
         logging.info(f"Tunable parameters for this run:")
         logging.info(f"Red a threshold: {self.red_a_threshold}")
