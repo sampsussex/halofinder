@@ -3,9 +3,9 @@
 run_options:  
   run_group_finder: False  # Set to true to run the group finder
   run_mock_comparison: True  # Set to true to compare score to mock
-  optimse_on_mock: False # Set to true to optimse the group finder parameters based on mock comparison
+  optimse_on_mock: True # Set to true to optimse the group finder parameters based on mock comparison
   optimse_parameter_space: False # Set to true to grid search parameter space based on mock comparison
-  make_plots: True # Set to false to skip generating plots
+  make_plots: False # Set to false to skip generating plots
   mode: "lhmr" # Mass assignment mode: abundance_match, shmr, lhmr, or red_blue_lhmr
   
 

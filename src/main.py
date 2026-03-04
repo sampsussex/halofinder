@@ -23,10 +23,10 @@ def optimize_on_mock(config_reader):
     ]
 
     bounds = [
-        (5.0, 15.0),  # red_a_threshold
-        (-2.0, 2.0),  # red_b_threshold
-        (5.0, 15.0),  # blue_a_threshold
-        (-2.0, 2.0),  # blue_b_threshold
+        (0.1, 4),  # red_a_threshold
+        (-4.0, 0.1),  # red_b_threshold
+        (0.1, 4),  # blue_a_threshold
+        (-4.0, 0.1),  # blue_b_threshold
     ]
 
     def objective_function(params):
@@ -50,16 +50,16 @@ def optimize_on_mock(config_reader):
         return -halo_finder.s_tot
 
     return minimize(
-        objective_function, initial_params, bounds=bounds, method="L-BFGS-B"
+        objective_function, initial_params, bounds=bounds, method="Nelder-Mead"
     )
 
 
-def grid_search_on_mock(config_reader, num_points=5):
+def grid_search_on_mock(config_reader, num_points=1000):
     bounds = [
-        (1, 7),  # red_a_threshold
-        (0, 0),  # red_b_threshold
-        (1, 7),  # blue_a_threshold
-        (0, 0),  # blue_b_threshold
+        (1, 4),  # red_a_threshold
+        (-3, 0.1),  # red_b_threshold
+        (1, 4),  # blue_a_threshold
+        (-3, 0.1),  # blue_b_threshold
     ]
     param_names = [
         "red_a_threshold",
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         print(f"Best parameters = {result.x}")
     elif run_options.get("optimse_parameter_space"):
         print("Running parameter-space grid search on mock comparison...")
-        results_path = grid_search_on_mock(config_reader, num_points=100)
+        results_path = grid_search_on_mock(config_reader, num_points=90)
         print(f"Grid search complete. Results saved to {results_path}")
     elif run_options.get("run_group_finder") or run_options.get("run_mock_comparison"):
         print("Running Halo Finder...")
