@@ -568,6 +568,7 @@ class HaloFinder:
         )
 
     def update_lhmr_dynamical_calibration(self):
+        logging.info("Updating dynamical LHMR calibration...")
         if self.mass_assignment_mode != "lhmr_dynamical_calibrated":
             return
 
@@ -600,6 +601,31 @@ class HaloFinder:
                 "Could not update dynamical LHMR calibration (valid groups=%d); retaining previous slope/intercept",
                 n_used,
             )
+
+        if self.make_plots:
+            # Plot dynamical mass vs group luminosity with the fitted relation
+            plt.scatter(
+                np.log10(self.group_luminosities * 1e14),
+                np.log10(group_dynamical_masses * 1e14),
+                s=0.1,
+            )
+            x = np.linspace(
+                np.min(self.group_luminosities * 1e14),
+                np.max(self.group_luminosities * 1e14),
+                100,
+            )
+            y = 10 ** (self.lhmr_dyn_current_intercept + self.lhmr_dyn_current_slope * np.log10(x))
+            plt.plot(np.log10(x), np.log10(y), color="red", label="Fitted LHMR")
+            plt.title("Dynamical Mass vs Group Luminosity with Fitted LHMR")
+            plt.xlabel("log10(Group Luminosity / $10^{14}h^{-1}$)")
+            plt.ylabel("log10(Dynamical Mass / $10^{14}h^{-1}$)")
+            plt.legend()
+            plt.savefig(
+                f"{self.plot_save_dir}/dynamical_mass_vs_luminosity_iter_{self.iteration_counter}.png"
+            )
+            plt.clf()
+            
+
 
     def save_galaxy_groups(self):
         logging.info(f"Saving galaxy groups at the location: {self.save_path}")
@@ -638,7 +664,8 @@ class HaloFinder:
                 )
                 self.group_ids = self.new_members.copy()
                 self.update_group_luminosity_and_centres()
-                self.update_lhmr_dynamical_calibration()
+                if self.mass_assignment_mode == "lhmr_dynamical_calibrated":
+                    self.update_lhmr_dynamical_calibration()
                 self.update_group_halo_masses()
                 self.debugging_plots()
                 logging.info(f"Iteration number : {self.iteration_counter} complete")
@@ -765,8 +792,9 @@ class RunHaloFinder(HaloFinder):
         self.initial_group_central_satellite_assignment()
         self.initial_luminosities()
         self.update_group_luminosity_and_centres()
-        self.lhmr_dyn_current_slope = self.lhmr_slope
-        self.lhmr_dyn_current_intercept = self.lhmr_intercept
+        if self.mass_assignment_mode in ("lhmr_dynamical_calibrated"):
+            self.lhmr_dyn_current_slope = self.lhmr_slope
+            self.lhmr_dyn_current_intercept = self.lhmr_intercept
         self.update_group_halo_masses()
         logging.info(f"Tunable parameters for this run:")
         logging.info(f"Red a threshold: {self.red_a_threshold}")
@@ -786,8 +814,9 @@ class RunHaloFinder(HaloFinder):
         self.initial_group_central_satellite_assignment()
         self.initial_luminosities()
         self.update_group_luminosity_and_centres()
-        self.lhmr_dyn_current_slope = self.lhmr_slope
-        self.lhmr_dyn_current_intercept = self.lhmr_intercept
+        if self.mass_assignment_mode in ("lhmr_dynamical_calibrated"):
+            self.lhmr_dyn_current_slope = self.lhmr_slope
+            self.lhmr_dyn_current_intercept = self.lhmr_intercept
         self.update_group_halo_masses()
         logging.info(f"Tunable parameters for this run:")
         logging.info(f"Red a threshold: {self.red_a_threshold}")

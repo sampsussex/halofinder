@@ -1,10 +1,10 @@
 run_options:
   run_group_finder: False
   run_mock_comparison: True
-  optimse_on_mock: True
+  optimse_on_mock: False
   optimse_parameter_space: False
   make_plots: False
-  mode: "lhmr" # abundance_match, shmr, lhmr, red_blue_lhmr, lhmr_dynamical_calibrated
+  mode: "lhmr_dynamical_calibrated" # abundance_match, shmr, lhmr, red_blue_lhmr, lhmr_dynamical_calibrated
 
 cosmology:
   h: 0.6751
