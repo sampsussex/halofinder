@@ -3,7 +3,7 @@ run_options:
   run_mock_comparison: True
   optimse_on_mock: False
   optimse_parameter_space: False
-  make_plots: False
+  make_plots: True
   mode: "lhmr_dynamical_calibrated" # abundance_match, shmr, lhmr, red_blue_lhmr, lhmr_dynamical_calibrated
 
 cosmology:
@@ -64,7 +64,7 @@ red_blue_lhmr_params:
   lhmr_intercept_blue: -3.501
 
 lhmr_dynamical_calibrated_params:
-  A: 1.0
+  A: 10.0
   min_group_members: 5
 
 luminosity_function_options:

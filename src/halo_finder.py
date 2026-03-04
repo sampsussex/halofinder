@@ -368,7 +368,7 @@ class HaloFinder:
     def initial_mass_assignment(self):
         logging.info("Generating initial halo masses from mass-to-light ratio...")
         self.group_halo_masses = find_all_initial_mass_to_light(
-            self.group_luminosities, 500.0
+            self.group_luminosities, 100.0
         )
         logging.info("Initial halo masses assigned.")
 
@@ -478,7 +478,7 @@ class HaloFinder:
 
         elif self.mass_assignment_mode == 'lhmr_dynamical_calibrated':
             if self.iteration_counter == 0:
-                self.group_halo_masses = find_all_initial_mass_to_light(self.group_luminosities, 500.0)
+                self.group_halo_masses = find_all_initial_mass_to_light(self.group_luminosities, 50.0)
             else:
                 self.group_halo_masses = linear_luminosity2halo_mass(
                     self.group_luminosities,
@@ -520,7 +520,7 @@ class HaloFinder:
 
     def apply_halo_finder(self):
         logging.info("Performing iteration of group finder")
-        if self.mass_assignment_mode in ("shmr", "lhmr", "red_blue_lhmr", "lhmr_dynamical_calibrated"):
+        if self.mass_assignment_mode in ("shmr", "lhmr", "red_blue_lhmr"):
             use_active_groups = self.active_group_ids is not None
             if use_active_groups:
                 logging.info(

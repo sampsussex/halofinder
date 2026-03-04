@@ -667,10 +667,10 @@ def calculate_velocity_disp_corr_mass(
 def dynamical_mass(gapper_velocity_dispersion, r50, A):
     G_MSOL_MPC_KMS2 = 4.302e-9 #Mpc (km/s)^2 / M_sun
     raw_mass = (r50 * (gapper_velocity_dispersion**2)) / G_MSOL_MPC_KMS2 if np.isfinite(r50) else np.nan
-    return A * raw_mass if np.isfinite(raw_mass) else np.nan
+    return A * raw_mass / 1e14 if np.isfinite(raw_mass) else np.nan
 
 
-@njit(parallel=True)
+@njit
 def fit_log_luminosity_log_mass_relation(group_luminosities, group_dynamical_masses, group_sizes, min_group_members):
     """
     Fit log10(Mdyn) = intercept + slope * log10(Lgroup) using groups above a size threshold.
@@ -692,7 +692,7 @@ def fit_log_luminosity_log_mass_relation(group_luminosities, group_dynamical_mas
     for i in range(n):
         if group_sizes[i] >= min_group_members and group_luminosities[i] > 0.0 and group_dynamical_masses[i] > 0.0:
             x[j] = np.log10(group_luminosities[i] * 1e14)
-            y[j] = np.log10(group_dynamical_masses[i])
+            y[j] = np.log10(group_dynamical_masses[i] * 1e14)
             j += 1
 
     mean_x = 0.0
