@@ -576,8 +576,14 @@ class HaloFinder:
             self.group_ids,
             self.unique_groups,
             self.zobs,
+            self.ra,
+            self.dec,
+            self.group_centres_ra,
+            self.group_centres_dec,
+            self.group_centres_z,
             self.group_sizes,
             self.lhmr_dyn_A,
+            self.omega_matter,
         )
 
         slope, intercept, n_used = fit_log_luminosity_log_mass_relation(

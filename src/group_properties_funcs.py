@@ -555,6 +555,7 @@ def calculate_radius(
     group_center_ra: float,
     group_center_dec: float,
     group_center_z: float,
+    omega_matter: float,
 ) -> np.ndarray:
     """
     Returns [R50, R68, R100] in Mpc (comoving, using center distance).
@@ -563,7 +564,7 @@ def calculate_radius(
     if n == 0:
         return np.array([np.nan, np.nan, np.nan], dtype=np.float64)
 
-    dist = float(comoving_distance(group_center_z))  # Mpc
+    dist = float(comoving_distance(group_center_z, omega_matter))  # Mpc
     center = spherical_to_cartesian(group_center_ra, group_center_dec, dist)
 
     dists = np.empty(n, dtype=np.float64)
@@ -662,6 +663,7 @@ def calculate_velocity_disp_corr_mass(
     return correction_factor * (los_velocity_dispersion_kms**2) * radius_mpc / G_MSOL_MPC_KMS2
 
 
+@njit(cache=True)
 def dynamical_mass(gapper_velocity_dispersion, r50, A):
     G_MSOL_MPC_KMS2 = 4.302e-9 #Mpc (km/s)^2 / M_sun
     raw_mass = (r50 * (gapper_velocity_dispersion**2)) / G_MSOL_MPC_KMS2 if np.isfinite(r50) else np.nan
@@ -718,7 +720,7 @@ def fit_log_luminosity_log_mass_relation(group_luminosities, group_dynamical_mas
 
 
 @njit(parallel=True)
-def calculate_group_dynamical_masses(group_ids, unique_groups, zobs, group_sizes, A):
+def calculate_group_dynamical_masses(group_ids, unique_groups, zobs, ra, dec, group_centres_ra, group_centres_dec, group_centres_z, group_sizes, A, omega_matter):
     """Compute dynamical mass per group from member redshifts and R50 proxy radius."""
     n_groups = unique_groups.size
     masses = np.empty(n_groups, dtype=np.float64)
@@ -732,19 +734,27 @@ def calculate_group_dynamical_masses(group_ids, unique_groups, zobs, group_sizes
             continue
 
         member_z = np.empty(count, dtype=np.float64)
+        member_ra = np.empty(count, dtype=np.float64)
+        member_dec = np.empty(count, dtype=np.float64)
         idx = 0
         for j in range(group_ids.size):
             if group_ids[j] == gid:
                 member_z[idx] = zobs[j]
+                member_ra[idx] = ra[j]
+                member_dec[idx] = dec[j]
                 idx += 1
 
         sigma, _ = velocity_dispersion_gapper(member_z, vel_errs[:count])
 
-        z_med = median_1d(member_z)
-        if np.isfinite(z_med) and z_med > 0.0:
-            r50 = 0.5 * comoving_distance(z_med) / 1000.0
-        else:
-            r50 = np.nan
+        radii = calculate_radius(
+            member_ra,
+            member_dec,
+            group_centres_ra[i],
+            group_centres_dec[i],
+            group_centres_z[i],
+            omega_matter,
+        )
+        r50 = radii[0]
 
         masses[i] = dynamical_mass(sigma, r50, A)
 
