@@ -548,7 +548,6 @@ def calculate_iterative_center_idx(ra_deg: np.ndarray, dec_deg: np.ndarray, mags
                 best_i = i
     return best_i
 
-
 @njit
 def calculate_radius(
     ra_deg: np.ndarray,
@@ -556,7 +555,6 @@ def calculate_radius(
     group_center_ra: float,
     group_center_dec: float,
     group_center_z: float,
-    cosmo,
 ) -> np.ndarray:
     """
     Returns [R50, R68, R100] in Mpc (comoving, using center distance).
@@ -565,7 +563,7 @@ def calculate_radius(
     if n == 0:
         return np.array([np.nan, np.nan, np.nan], dtype=np.float64)
 
-    dist = float(cosmo.comoving_distance(group_center_z))  # Mpc
+    dist = float(comoving_distance(group_center_z))  # Mpc
     center = spherical_to_cartesian(group_center_ra, group_center_dec, dist)
 
     dists = np.empty(n, dtype=np.float64)
@@ -662,3 +660,9 @@ def calculate_velocity_disp_corr_mass(
     correction_factor = 5.0 / 3.0 + a_b + a_c
     G_MSOL_MPC_KMS2 = 4.302e-9 #Mpc (km/s)^2 / M_sun
     return correction_factor * (los_velocity_dispersion_kms**2) * radius_mpc / G_MSOL_MPC_KMS2
+
+
+def dynamical_mass(gapper_velocity_dispersion, r50, A):
+    G_MSOL_MPC_KMS2 = 4.302e-9 #Mpc (km/s)^2 / M_sun
+    raw_mass = (r50 * (gapper_velocity_dispersion**2)) / G_MSOL_MPC_KMS2 if np.isfinite(r50) else np.nan
+    return A * raw_mass if np.isfinite(raw_mass) else np.nan
