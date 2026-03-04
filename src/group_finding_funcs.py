@@ -10,12 +10,6 @@ from halo_p_M_funcs import find_p_M
 
 
 @njit
-def negative_exponential_func(x, B_a, B_b, B_c):
-    """A helper function to compute negative exponential values."""
-    return B_a * np.exp(-B_b * x) + B_c
-
-
-@njit
 def halo_mass_dependent_threshold(log_halo_mass, a, b, b_piv):
     """Threshold model with halo-mass dependence."""
     return a + b * (log_halo_mass - b_piv)

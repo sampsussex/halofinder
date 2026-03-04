@@ -1,7 +1,17 @@
 import numpy as np
 from numba import njit, prange
 from luminosity_mass_funcs import luminosity_correction_factor
-
+from cosmo_funcs import (luminosity_to_mag,
+                         magnitude_to_luminosity,
+                         comoving_distance,
+                         spherical_to_cartesian,
+                         get_all_comoving_distance,
+                         find_all_spherical_to_cartesian,
+                         get_all_luminosity_to_magnitude,
+                         get_all_magnitude_to_luminosity,
+                         cartesian_to_spherical
+                         )
+from typing import Optional, Sequence, Tuple, List
 
 @njit
 def find_all_initial_mass_to_light(group_luminosity, mass_light_gain):
@@ -345,3 +355,310 @@ def brightest_galaxy_centers_fast(
         omega_matter,
         h,
     )
+# -----------------------------
+# Numba helpers: stats
+# -----------------------------
+@njit(cache=True)
+def mean_1d(x: np.ndarray) -> float:
+    s = 0.0
+    n = x.size
+    for i in range(n):
+        s += x[i]
+    return s / n if n > 0 else np.nan
+
+
+@njit(cache=True)
+def median_sorted(x_sorted: np.ndarray) -> float:
+    n = x_sorted.size
+    if n == 0:
+        return np.nan
+    mid = n // 2
+    if n % 2 == 1:
+        return x_sorted[mid]
+    return 0.5 * (x_sorted[mid - 1] + x_sorted[mid])
+
+
+@njit(cache=True)
+def median_1d(x: np.ndarray) -> float:
+    if x.size == 0:
+        return np.nan
+    xs = np.sort(x.copy())
+    return median_sorted(xs)
+
+
+@njit(cache=True)
+def quantile_interpolated_sorted(x_sorted: np.ndarray, q: float) -> float:
+    """
+    Linear-interpolated quantile on already-sorted array (like many "type=7" defs).
+    """
+    n = x_sorted.size
+    if n == 0:
+        return np.nan
+    if q <= 0.0:
+        return x_sorted[0]
+    if q >= 1.0:
+        return x_sorted[n - 1]
+
+    # position in [0, n-1]
+    pos = q * (n - 1)
+    lo = int(np.floor(pos))
+    hi = int(np.ceil(pos))
+    if hi == lo:
+        return x_sorted[lo]
+    t = pos - lo
+    return (1.0 - t) * x_sorted[lo] + t * x_sorted[hi]
+
+
+@njit(cache=True)
+def quantile_interpolated(x: np.ndarray, q: float) -> float:
+    xs = np.sort(x.copy())
+    return quantile_interpolated_sorted(xs, q)
+
+
+@njit(cache=True)
+def euclidean_distance_3d(a: np.ndarray, b: np.ndarray) -> float:
+    dx = a[0] - b[0]
+    dy = a[1] - b[1]
+    dz = a[2] - b[2]
+    return np.sqrt(dx * dx + dy * dy + dz * dz)
+
+
+@njit(cache=True)
+def velocity_dispersion_gapper(redshifts: np.ndarray, vel_errs: np.ndarray) -> Tuple[float, float]:
+    """
+    Returns: (dispersion, sigma_err)
+    Implements the same logic as the Rust code.
+    """
+    n = redshifts.size
+    if n < 2:
+        return 0.0, np.sqrt(mean_1d(vel_errs)) if vel_errs.size > 0 else 0.0
+
+    sigma_err_sq = mean_1d(vel_errs)
+    z_med = median_1d(redshifts)
+
+    # v_i = (z_i * c) / (1 + z_med)
+    velocities = np.empty(n, dtype=np.float64)
+    denom = 1.0 + z_med
+    C = 299792.458
+    for i in range(n):
+        velocities[i] = (redshifts[i] * C) / denom
+
+    velocities.sort()
+
+    # gaps (n-1)
+    gaps = np.empty(n - 1, dtype=np.float64)
+    for i in range(n - 1):
+        gaps[i] = velocities[i + 1] - velocities[i]
+
+    # weights: i*(n-i) for i=1..n-1
+    # sum weights*gaps
+    s = 0.0
+    nf = float(n)
+    for i in range(1, n):
+        w = i * (n - i)
+        s += float(w) * gaps[i - 1]
+
+    sigma_gap = (np.sqrt(np.pi) / (nf * (nf - 1.0))) * s
+    raw_disp_sq = (nf * sigma_gap * sigma_gap) / (nf - 1.0)
+
+    if raw_disp_sq > sigma_err_sq:
+        disp = np.sqrt(raw_disp_sq - sigma_err_sq)
+    else:
+        disp = 0.0
+
+    return disp, np.sqrt(sigma_err_sq)
+
+
+@njit(cache=True)
+def calculate_iterative_center_idx(ra_deg: np.ndarray, dec_deg: np.ndarray, mags: np.ndarray, M_sun: np.float64) -> int:
+    """
+    Returns original index (0..n-1) of the final remaining object after iteratively
+    removing the furthest object from the flux-weighted center (in cartesian space),
+    then choosing the remaining with highest flux.
+    """
+    n = ra_deg.size
+    if n == 0:
+        return -1
+    if n == 1:
+        return 0
+
+    # coords unit vectors
+    coords = np.empty((n, 3), dtype=np.float64)
+    flux = np.empty(n, dtype=np.float64)
+    for i in range(n):
+        v = spherical_to_cartesian(ra_deg[i], dec_deg[i], 1.0)
+        coords[i, 0] = v[0]
+        coords[i, 1] = v[1]
+        coords[i, 2] = v[2]
+        flux[i] = magnitude_to_luminosity(mags[i], M_sun)
+
+    alive = np.ones(n, dtype=np.uint8)  # 1=keep,0=removed
+    alive_count = n
+
+    # while > 2 alive
+    while alive_count > 2:
+        # flux sum
+        fsum = 0.0
+        for i in range(n):
+            if alive[i] == 1:
+                fsum += flux[i]
+        if fsum == 0.0:
+            break
+
+        # center = sum(coord*flux)/fsum
+        cx = 0.0
+        cy = 0.0
+        cz = 0.0
+        for i in range(n):
+            if alive[i] == 1:
+                f = flux[i]
+                cx += coords[i, 0] * f
+                cy += coords[i, 1] * f
+                cz += coords[i, 2] * f
+        cx /= fsum
+        cy /= fsum
+        cz /= fsum
+
+        # find furthest alive
+        max_d = -1.0
+        max_i = -1
+        for i in range(n):
+            if alive[i] == 1:
+                dx = coords[i, 0] - cx
+                dy = coords[i, 1] - cy
+                dz = coords[i, 2] - cz
+                d = np.sqrt(dx * dx + dy * dy + dz * dz)
+                if d > max_d:
+                    max_d = d
+                    max_i = i
+
+        if max_i < 0:
+            break
+
+        alive[max_i] = 0
+        alive_count -= 1
+
+    # among remaining, choose highest flux
+    best_i = -1
+    best_f = -1.0
+    for i in range(n):
+        if alive[i] == 1:
+            if flux[i] > best_f:
+                best_f = flux[i]
+                best_i = i
+    return best_i
+
+
+@njit
+def calculate_radius(
+    ra_deg: np.ndarray,
+    dec_deg: np.ndarray,
+    group_center_ra: float,
+    group_center_dec: float,
+    group_center_z: float,
+    cosmo,
+) -> np.ndarray:
+    """
+    Returns [R50, R68, R100] in Mpc (comoving, using center distance).
+    """
+    n = ra_deg.size
+    if n == 0:
+        return np.array([np.nan, np.nan, np.nan], dtype=np.float64)
+
+    dist = float(cosmo.comoving_distance(group_center_z))  # Mpc
+    center = spherical_to_cartesian(group_center_ra, group_center_dec, dist)
+
+    dists = np.empty(n, dtype=np.float64)
+    for i in range(n):
+        pos = spherical_to_cartesian(ra_deg[i], dec_deg[i], dist)
+        dists[i] = euclidean_distance_3d(pos, center)
+
+    dists.sort()
+
+    q50 = quantile_interpolated_sorted(dists, 0.5)
+    q68 = quantile_interpolated_sorted(dists, 0.68)
+    q100 = dists[-1]
+    return np.array([q50, q68, q100], dtype=np.float64)
+
+
+@njit(cache=True)
+def calculate_center_of_light(ra_deg: np.ndarray, dec_deg: np.ndarray, mags: np.ndarray, M_sun: np.float64) -> Tuple[float, float]:
+    n = ra_deg.size
+    if n == 0:
+        return np.nan, np.nan
+
+    fluxes = np.empty(n, dtype=np.float64)
+    sum_flux = 0.0
+    for i in range(n):
+        f = magnitude_to_luminosity(mags[i], M_sun)
+        fluxes[i] = f
+        sum_flux += f
+    if sum_flux == 0.0:
+        return np.nan, np.nan
+
+    wx = 0.0
+    wy = 0.0
+    wz = 0.0
+    for i in range(n):
+        v = spherical_to_cartesian(ra_deg[i], dec_deg[i])
+        f = fluxes[i]
+        wx += v[0] * f
+        wy += v[1] * f
+        wz += v[2] * f
+
+    wx /= sum_flux
+    wy /= sum_flux
+    wz /= sum_flux
+
+    eq = spherical_to_cartesian(wx, wy, wz)
+    return float(eq[0]), float(eq[1])
+
+
+@njit(cache=True)
+def calculate_flux_weighted_redshift(redshifts: np.ndarray, mags: np.ndarray, M_sun: np.float64) -> float:
+    n = redshifts.size
+    if n == 0:
+        return np.nan
+    sum_flux = 0.0
+    num = 0.0
+    for i in range(n):
+        f = magnitude_to_luminosity(mags[i], M_sun)
+        sum_flux += f
+        num += redshifts[i] * f
+    return num / sum_flux if sum_flux != 0.0 else np.nan
+
+
+@njit(cache=True)
+def calculate_total_mass(gravitational_radius_mpc: float, los_velocity_dispersion_kms: float) -> float:
+    """
+    Tempel+2014 Eqn 8 style (as given).
+    """
+    return 2.325e12 * gravitational_radius_mpc * ((3.0 ** (1.0 / 3.0)) * los_velocity_dispersion_kms / 100.0) ** 2
+
+
+@njit
+def calculate_velocity_disp_corr_mass(
+    radius_mpc: float,
+    los_velocity_dispersion_kms: float,
+    cosmo,
+) -> float:
+    """
+    van Kampen+2026 style correction. Kept as Python because it needs cosmo.h0.
+    """
+    alpha = 1.030
+    dispersion_limit = 244.634
+    n1 = -1.989
+    beta = 0.213
+    rad_lim = 0.369 * 0.7 / (cosmo.h0 / 100.0)
+    n2 = -1.591
+
+    a_b = 0.0
+    a_c = 0.0
+    if los_velocity_dispersion_kms < dispersion_limit:
+        a_b = alpha * ((los_velocity_dispersion_kms / dispersion_limit) ** n1 - 1.0)
+    if radius_mpc < rad_lim:
+        a_c = beta * ((radius_mpc / rad_lim) ** n2 - 1.0)
+
+    correction_factor = 5.0 / 3.0 + a_b + a_c
+    G_MSOL_MPC_KMS2 = 4.302e-9 #Mpc (km/s)^2 / M_sun
+    return correction_factor * (los_velocity_dispersion_kms**2) * radius_mpc / G_MSOL_MPC_KMS2

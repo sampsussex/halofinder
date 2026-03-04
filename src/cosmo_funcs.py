@@ -398,3 +398,60 @@ def find_all_spherical_to_cartesian(ra, dec, comoving_distance):
         all_coords[i, 2] = comoving_distance[i] * np.sin(np.deg2rad(dec[i]))
 
     return all_coords
+
+
+@njit
+def cartesian_to_spherical(x, y, z):
+    """
+    Convert Cartesian coordinates to spherical coordinates.
+
+    Parameters:
+    ----------
+    x : float
+        X coordinate
+    y : float
+        Y coordinate
+    z : float
+        Z coordinate
+
+    Returns:
+    -------
+    tuple
+        (ra, dec, r) where ra and dec are in degrees and r is in the same units as the input coordinates.
+    """
+    r = np.sqrt(x**2 + y**2 + z**2)
+    ra = np.degrees(np.arctan2(y, x)) % 360  # Ensure RA is in [0, 360)
+    dec = np.degrees(np.arcsin(z / r))
+    return ra, dec, r
+
+
+@njit
+def get_all_cartesian_to_spherical(xs, ys, zs):
+    """
+    Convert arrays of Cartesian coordinates to spherical coordinates.
+
+    Parameters:
+    ----------
+    xs : array-like
+        X coordinates
+    ys : array-like
+        Y coordinates
+    zs : array-like
+        Z coordinates
+
+    Returns:
+    -------
+    tuple
+        (ra_array, dec_array, r_array) where ra and dec are in degrees and r is in the same units as the input coordinates.
+    """
+    n = len(xs)
+    ra_array = np.zeros(n)
+    dec_array = np.zeros(n)
+    r_array = np.zeros(n)
+
+    for i in range(n):
+        r_array[i] = np.sqrt(xs[i] ** 2 + ys[i] ** 2 + zs[i] ** 2)
+        ra_array[i] = np.degrees(np.arctan2(ys[i], xs[i])) % 360
+        dec_array[i] = np.degrees(np.arcsin(zs[i] / r_array[i]))
+
+    return ra_array, dec_array, r_array
