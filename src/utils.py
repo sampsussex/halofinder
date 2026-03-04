@@ -59,12 +59,70 @@ class ConfigReader:
         return self.config["file_locations"]
 
     def get_setup_options(self) -> Dict[str, Any]:
-        """Get setup options."""
+        """Get general finder setup options (legacy alias for finder_options)."""
+        if "finder_options" in self.config:
+            return self.config["finder_options"]
         return self.config["setup_options"]
 
+    def get_finder_options(self) -> Dict[str, Any]:
+        """Get general finder setup options."""
+        return self.get_setup_options()
+
     def get_hmf_options(self) -> Dict[str, float]:
-        """Get HMF (Halo Mass Function) options."""
+        """Get abundance-matching/HMF options (legacy alias supported)."""
+        if "abundance_match_params" in self.config:
+            return self.config["abundance_match_params"]
         return self.config["hmf_options"]
+
+
+    def get_threshold_model_params(self) -> Dict[str, float]:
+        """Get group-assignment threshold model parameters."""
+        if "threshold_model_params" in self.config:
+            return self.config["threshold_model_params"]
+        setup = self.get_setup_options()
+        return {
+            "red_a_threshold": setup["red_a_threshold"],
+            "red_b_threshold": setup["red_b_threshold"],
+            "blue_a_threshold": setup["blue_a_threshold"],
+            "blue_b_threshold": setup["blue_b_threshold"],
+            "threshold_b_pivot": setup["threshold_b_pivot"],
+        }
+
+    def get_shmr_params(self) -> Dict[str, float]:
+        """Get SHMR relation parameters."""
+        if "shmr_params" in self.config:
+            return self.config["shmr_params"]
+        setup = self.get_setup_options()
+        return {
+            "shmr_slope": setup["shmr_slope"],
+            "shmr_intercept": setup["shmr_intercept"],
+        }
+
+    def get_lhmr_params(self) -> Dict[str, float]:
+        """Get LHMR relation parameters."""
+        if "lhmr_params" in self.config:
+            return self.config["lhmr_params"]
+        setup = self.get_setup_options()
+        return {
+            "lhmr_slope": setup["lhmr_slope"],
+            "lhmr_intercept": setup["lhmr_intercept"],
+        }
+
+    def get_red_blue_lhmr_params(self) -> Dict[str, float]:
+        """Get red/blue LHMR relation parameters."""
+        if "red_blue_lhmr_params" in self.config:
+            return self.config["red_blue_lhmr_params"]
+        setup = self.get_setup_options()
+        return {
+            "lhmr_slope_red": setup["lhmr_slope_red"],
+            "lhmr_intercept_red": setup["lhmr_intercept_red"],
+            "lhmr_slope_blue": setup["lhmr_slope_blue"],
+            "lhmr_intercept_blue": setup["lhmr_intercept_blue"],
+        }
+
+    def get_lhmr_dynamical_calibrated_params(self) -> Dict[str, Any]:
+        """Get parameters for dynamical-mass-calibrated LHMR mode."""
+        return self.config.get("lhmr_dynamical_calibrated_params", {})
 
     def get_mock_comparison_options(self) -> Dict[str, Any]:
         """Get bijective matching options."""

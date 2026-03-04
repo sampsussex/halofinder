@@ -666,3 +666,86 @@ def dynamical_mass(gapper_velocity_dispersion, r50, A):
     G_MSOL_MPC_KMS2 = 4.302e-9 #Mpc (km/s)^2 / M_sun
     raw_mass = (r50 * (gapper_velocity_dispersion**2)) / G_MSOL_MPC_KMS2 if np.isfinite(r50) else np.nan
     return A * raw_mass if np.isfinite(raw_mass) else np.nan
+
+
+@njit(parallel=True)
+def fit_log_luminosity_log_mass_relation(group_luminosities, group_dynamical_masses, group_sizes, min_group_members):
+    """
+    Fit log10(Mdyn) = intercept + slope * log10(Lgroup) using groups above a size threshold.
+    Returns (slope, intercept, n_used).
+    """
+    n = group_luminosities.size
+    valid_count = 0
+    for i in range(n):
+        if group_sizes[i] >= min_group_members and group_luminosities[i] > 0.0 and group_dynamical_masses[i] > 0.0:
+            valid_count += 1
+
+    if valid_count < 2:
+        return np.nan, np.nan, valid_count
+
+    x = np.empty(valid_count, dtype=np.float64)
+    y = np.empty(valid_count, dtype=np.float64)
+
+    j = 0
+    for i in range(n):
+        if group_sizes[i] >= min_group_members and group_luminosities[i] > 0.0 and group_dynamical_masses[i] > 0.0:
+            x[j] = np.log10(group_luminosities[i] * 1e14)
+            y[j] = np.log10(group_dynamical_masses[i])
+            j += 1
+
+    mean_x = 0.0
+    mean_y = 0.0
+    for i in range(valid_count):
+        mean_x += x[i]
+        mean_y += y[i]
+    mean_x /= valid_count
+    mean_y /= valid_count
+
+    var_x = 0.0
+    cov_xy = 0.0
+    for i in range(valid_count):
+        dx = x[i] - mean_x
+        dy = y[i] - mean_y
+        var_x += dx * dx
+        cov_xy += dx * dy
+
+    if var_x <= 0.0:
+        return np.nan, np.nan, valid_count
+
+    slope = cov_xy / var_x
+    intercept = mean_y - slope * mean_x
+    return slope, intercept, valid_count
+
+
+@njit(parallel=True)
+def calculate_group_dynamical_masses(group_ids, unique_groups, zobs, group_sizes, A):
+    """Compute dynamical mass per group from member redshifts and R50 proxy radius."""
+    n_groups = unique_groups.size
+    masses = np.empty(n_groups, dtype=np.float64)
+    vel_errs = np.zeros(zobs.size, dtype=np.float64)
+
+    for i in prange(n_groups):
+        gid = unique_groups[i]
+        count = group_sizes[i]
+        if count < 2:
+            masses[i] = np.nan
+            continue
+
+        member_z = np.empty(count, dtype=np.float64)
+        idx = 0
+        for j in range(group_ids.size):
+            if group_ids[j] == gid:
+                member_z[idx] = zobs[j]
+                idx += 1
+
+        sigma, _ = velocity_dispersion_gapper(member_z, vel_errs[:count])
+
+        z_med = median_1d(member_z)
+        if np.isfinite(z_med) and z_med > 0.0:
+            r50 = 0.5 * comoving_distance(z_med) / 1000.0
+        else:
+            r50 = np.nan
+
+        masses[i] = dynamical_mass(sigma, r50, A)
+
+    return masses

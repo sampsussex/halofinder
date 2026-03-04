@@ -84,8 +84,13 @@ The project is configured via YAML (see `config_sharks.yaml`).
 - `survey_fractional_sky_area`: survey sky fraction for volume calculations.
 - `column_names`: maps required data fields to input catalog column names.
 - `file_locations`: input catalog path and output files/directories.
-- `setup_options`: finder thresholds, pivots, SHMR parameters, iteration count, etc.
-- `hmf_options`: mass range and resolution for halo mass function generation.
+- `finder_options`: survey magnitude, iteration count, and global finder toggles.
+- `threshold_model_params`: red/blue threshold model coefficients used during assignment updates.
+- `abundance_match_params`: mass range and resolution for halo mass function generation.
+- `shmr_params`: stellar-mass-to-halo-mass linear relation coefficients.
+- `lhmr_params`: luminosity-to-halo-mass linear relation coefficients.
+- `red_blue_lhmr_params`: colour-split luminosity-to-halo-mass relation coefficients.
+- `lhmr_dynamical_calibrated_params`: self-calibration settings (`A`, `min_group_members`).
 - `luminosity_function_options`: Schechter parameters (`phi_star`, `M_star`, `alpha`).
 - `mock_comparison_options`: settings used in bijective matching.
 
@@ -115,7 +120,7 @@ python src/main.py config_sharks.yaml
 
 ### Run modes
 
-`main.py` dispatches based on `run_options`:
+`main.py` dispatches based on `run_options`. Mass-assignment `mode` supports `abundance_match`, `shmr`, `lhmr`, `red_blue_lhmr`, and `lhmr_dynamical_calibrated`:
 
 1. **Single run** (`run_group_finder` or `run_mock_comparison`):
    - executes the finder once,
