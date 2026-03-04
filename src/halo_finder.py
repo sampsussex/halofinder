@@ -325,10 +325,10 @@ class HaloFinder:
         self.gal_DMs = get_all_comoving_distance(self.zobs, self.omega_matter)
         if self.make_plots:
             plt.hist(self.gal_DMs)
-            plt.title("Galaxy Distance moduli")
-            plt.ylabel("Freq.")
-            plt.xlabel("Comoving Distance, Mpc")
-            plt.savefig(f"{self.plot_save_dir}/galaxy_distance_moduli.png")
+            plt.title("Galaxy Comoving Distance Distribution")
+            plt.ylabel("Frequency")
+            plt.xlabel("Comoving Distance [Mpc]")
+            plt.savefig(f"{self.plot_save_dir}/galaxy_comoving_distance_distribution.png")
             plt.clf()
         logging.info("Comoving distances generated.")
         if cache is not None:
@@ -357,9 +357,9 @@ class HaloFinder:
 
         if self.make_plots:
             plt.hist(np.log10(self.gal_luminosities), log=True)
-            plt.title("Initial galaxy luminosities")
-            plt.ylabel("Freq.")
-            plt.xlabel("log10(Luminosity / $10^{14}h^{-1}$)")
+            plt.title("Initial Galaxy Luminosity Distribution")
+            plt.ylabel("Frequency")
+            plt.xlabel(r"log10(Galaxy Luminosity [$10^{14} h^{-2} L_{\odot}$])")
             plt.savefig(f"{self.plot_save_dir}/initial_galaxy_luminosities.png")
             plt.clf()
 
@@ -441,29 +441,35 @@ class HaloFinder:
 
         if self.make_plots:
             plt.hist(np.log10(self.group_luminosities * 1e14), log=True, bins=25)
-            plt.title("Halo Luminosity Histogram Pre Mass Assignment")
+            plt.title("Group Luminosity Distribution Before Mass Assignment")
+            plt.xlabel(r"log10(Group Luminosity [$h^{-2} L_{\odot}$])")
+            plt.ylabel("Frequency")
             plt.savefig(
-                f"{self.plot_save_dir}/halo_luminosities_iter_{self.iteration_counter}_pre_mass_assignment.png"
+                f"{self.plot_save_dir}/group_luminosities_iter_{self.iteration_counter}_pre_mass_assignment.png"
             )
             plt.clf()
             plt.hist(self.group_bcg_k_corrs)
-            plt.title("Group K-corrections")
+            plt.title("Group BCG K-Correction Distribution")
+            plt.xlabel("K-correction [mag]")
+            plt.ylabel("Frequency")
             plt.savefig(
-                f"{self.plot_save_dir}/group_k_corrections_iter_{self.iteration_counter}.png"
+                f"{self.plot_save_dir}/group_bcg_k_corrections_iter_{self.iteration_counter}.png"
             )
             plt.clf()
 
             plt.hist(self.group_magnitudes, log=True, bins=25)
-            plt.title("Halo Magnitude Histogram Pre Mass Assignment")
-            plt.xlabel("Absolute Magnitude")
+            plt.title("Group Absolute Magnitude Distribution Before Mass Assignment")
+            plt.xlabel("Absolute Magnitude [mag]")
+            plt.ylabel("Frequency")
             plt.savefig(
-                f"{self.plot_save_dir}/halo_magnitudes_iter_{self.iteration_counter}_pre_mass_assignment.png"
+                f"{self.plot_save_dir}/group_magnitudes_iter_{self.iteration_counter}_pre_mass_assignment.png"
             )
             plt.clf()
 
             plt.hist(self.group_centres_z)
-            plt.title("Group Redshift Histogram")
+            plt.title("Group Redshift Distribution")
             plt.xlabel("Redshift")
+            plt.ylabel("Frequency")
             plt.savefig(
                 f"{self.plot_save_dir}/group_redshifts_iter_{self.iteration_counter}.png"
             )
@@ -511,6 +517,9 @@ class HaloFinder:
 
         if self.make_plots:
             plt.hist(np.log10(1e14 * self.group_halo_masses), log=True, bins=25)
+            plt.title("Group Halo Mass Distribution After Mass Assignment")
+            plt.xlabel(r"log10(Group Halo Mass [$M_{\odot} h^{-1}$])")
+            plt.ylabel("Frequency")
             plt.savefig(
                 f"{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}_post_mass_assignment.png"
             )
@@ -623,8 +632,8 @@ class HaloFinder:
             y = 10 ** (self.lhmr_dyn_current_intercept + self.lhmr_dyn_current_slope * np.log10(x))
             plt.plot(np.log10(x), np.log10(y), color="red", label="Fitted LHMR")
             plt.title("Dynamical Mass vs Group Luminosity with Fitted LHMR")
-            plt.xlabel("log10(Group Luminosity / $10^{14}h^{-1}$)")
-            plt.ylabel("log10(Dynamical Mass / $10^{14}h^{-1}$)")
+            plt.xlabel(r"log10(Group Luminosity [$h^{-2} L_{\odot}$])")
+            plt.ylabel(r"log10(Dynamical Mass [$M_{\odot} h^{-1}$])")
             plt.legend()
             plt.savefig(
                 f"{self.plot_save_dir}/dynamical_mass_vs_luminosity_iter_{self.iteration_counter}.png"
@@ -702,9 +711,9 @@ class HaloFinder:
         logging.info("Creating debugging plots...")
         # Halo masses
         plt.hist(np.log10(self.group_halo_masses * 1e14), log=True, bins=25)
-        plt.title("Halo Mass Histogram")
-        plt.xlabel("log10(Halo Mass / $h^{-1}$)")
-        plt.ylabel("Freq.")
+        plt.title("Group Halo Mass Distribution")
+        plt.xlabel(r"log10(Group Halo Mass [$M_{\odot} h^{-1}$])")
+        plt.ylabel("Frequency")
         plt.savefig(
             f"{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}.png"
         )
@@ -712,9 +721,9 @@ class HaloFinder:
 
         # Halo luminosities
         plt.hist(np.log10(self.group_luminosities * 1e14), log=True, bins=25)
-        plt.title("Halo Luminosity Histogram")
-        plt.xlabel("log10(Luminosity)")
-        plt.ylabel("Freq.")
+        plt.title("Group Luminosity Distribution")
+        plt.xlabel(r"log10(Group Luminosity [$h^{-2} L_{\odot}$])")
+        plt.ylabel("Frequency")
         plt.savefig(
             f"{self.plot_save_dir}/halo_luminosities_iter_{self.iteration_counter}.png"
         )
@@ -722,9 +731,9 @@ class HaloFinder:
 
         # Halo N
         plt.hist(self.group_sizes, log=True, bins=50)
-        plt.title("Halo Population counts")
-        plt.ylabel("Freq.")
-        plt.xlabel("Galaxy number count per halo")
+        plt.title("Group Membership Count Distribution")
+        plt.ylabel("Frequency")
+        plt.xlabel("Galaxy Count per Group")
         plt.savefig(
             f"{self.plot_save_dir}/halo_population_counts_iter_{self.iteration_counter}.png"
         )
@@ -732,9 +741,9 @@ class HaloFinder:
 
         # Halo locations
         plt.scatter(self.group_centres_ra, self.group_centres_dec, s=0.1)
-        plt.title("Halo locations")
-        plt.xlabel("RA")
-        plt.ylabel("Dec")
+        plt.title("Group Sky Positions")
+        plt.xlabel("Right Ascension [deg]")
+        plt.ylabel("Declination [deg]")
 
         plt.savefig(
             f"{self.plot_save_dir}/halo_locations_iter_{self.iteration_counter}.png"
@@ -748,9 +757,9 @@ class HaloFinder:
             np.log10(self.group_halo_masses * 1e14),
             s=0.1,
         )
-        plt.title("Group stellar mass vs halo mass")
-        plt.xlabel("log10(Group stellar mass)")
-        plt.ylabel("log10(Halo Mass / $h^{-1}$)")
+        plt.title("Group Stellar Mass vs Halo Mass")
+        plt.xlabel(r"log10(Group Stellar Mass [$M_{\odot}$])")
+        plt.ylabel(r"log10(Group Halo Mass [$M_{\odot} h^{-1}$])")
         plt.savefig(
             f"{self.plot_save_dir}/halo_m_vs_stellar_m_iter_{self.iteration_counter}.png"
         )
@@ -761,9 +770,9 @@ class HaloFinder:
             np.log10(self.group_luminosities * 1e14),
             s=0.1,
         )
-        plt.title("Halo mass vs Luminosity")
-        plt.xlabel("log10(Halo Mass / h^{-1}$)")
-        plt.ylabel("log10(Luminosity /h^{-1}$)")
+        plt.title("Group Halo Mass vs Luminosity")
+        plt.xlabel(r"log10(Group Halo Mass [$M_{\odot} h^{-1}$])")
+        plt.ylabel(r"log10(Group Luminosity [$h^{-2} L_{\odot}$])")
 
         plt.savefig(
             f"{self.plot_save_dir}/halo_m_vs_l_iter_{self.iteration_counter}.png"
