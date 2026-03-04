@@ -516,9 +516,9 @@ class HaloFinder:
             )
 
         if self.make_plots:
-            plt.hist(np.log10(1e14 * self.group_halo_masses), log=True, bins=25)
+            plt.hist(self.group_halo_masses, log=True, bins=25)
             plt.title("Group Halo Mass Distribution After Mass Assignment")
-            plt.xlabel(r"log10(Group Halo Mass [$M_{\odot} h^{-1}$])")
+            plt.xlabel(r"Group Halo Mass [log10($M_{\odot} h^{-1}$)]")
             plt.ylabel("Frequency")
             plt.savefig(
                 f"{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}_post_mass_assignment.png"
@@ -710,9 +710,9 @@ class HaloFinder:
             return
         logging.info("Creating debugging plots...")
         # Halo masses
-        plt.hist(np.log10(self.group_halo_masses * 1e14), log=True, bins=25)
+        plt.hist(self.group_halo_masses, log=True, bins=25)
         plt.title("Group Halo Mass Distribution")
-        plt.xlabel(r"log10(Group Halo Mass [$M_{\odot} h^{-1}$])")
+        plt.xlabel(r"Group Halo Mass [log10($M_{\odot} h^{-1}$)]")
         plt.ylabel("Frequency")
         plt.savefig(
             f"{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}.png"
@@ -754,24 +754,24 @@ class HaloFinder:
 
         plt.scatter(
             np.log10(self.group_stellar_masses),
-            np.log10(self.group_halo_masses * 1e14),
+            self.group_halo_masses,
             s=0.1,
         )
         plt.title("Group Stellar Mass vs Halo Mass")
         plt.xlabel(r"log10(Group Stellar Mass [$M_{\odot}$])")
-        plt.ylabel(r"log10(Group Halo Mass [$M_{\odot} h^{-1}$])")
+        plt.ylabel(r"Group Halo Mass [log10($M_{\odot} h^{-1}$)]")
         plt.savefig(
             f"{self.plot_save_dir}/halo_m_vs_stellar_m_iter_{self.iteration_counter}.png"
         )
         plt.clf()
 
         plt.scatter(
-            np.log10(self.group_halo_masses * 1e14),
+            self.group_halo_masses,
             np.log10(self.group_luminosities * 1e14),
             s=0.1,
         )
         plt.title("Group Halo Mass vs Luminosity")
-        plt.xlabel(r"log10(Group Halo Mass [$M_{\odot} h^{-1}$])")
+        plt.xlabel(r"Group Halo Mass [log10($M_{\odot} h^{-1}$)]")
         plt.ylabel(r"log10(Group Luminosity [$h^{-2} L_{\odot}$])")
 
         plt.savefig(

@@ -106,7 +106,7 @@ def update_group_membership_halofinder(
     - group_dec: Declination of groups in degrees
     - group_z: Redshift of groups
     - group_sizes: Sizes of each group (number of galaxies in each group)
-    - group_halo_mass: Halo mass of each group in units of 10^14 h^-1 M_sun
+    - group_halo_mass: Halo mass of each group in units of log10(Msun/h)
     - galaxy_tree: KDTree for galaxy positions in spherical coordinates
     - is_central: input boolean array indicating current central galaxies
     - is_satellite: input boolean array indicating current satellite galaxies
@@ -248,7 +248,7 @@ def update_group_membership_halofinder(
                     continue
 
             # Assign as satellite if probability exceeds threshold
-            log_halo_mass = np.log10(group_halo_mass[group_idx] * 1e14)
+            log_halo_mass = group_halo_mass[group_idx]
             if is_red[neighbor_idx]:
                 threshold = halo_mass_dependent_threshold(
                     log_halo_mass,

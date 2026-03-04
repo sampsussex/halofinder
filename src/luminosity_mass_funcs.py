@@ -508,7 +508,7 @@ def abundance_match_halo_masses(
     Returns
     -------
     matched_masses : array
-        Array of halo mass thresholds in 10^14 h^-1 Msun corresponding to each galaxy.
+        Array of halo mass thresholds in log10(Msun/h) corresponding to each galaxy.
     """
     phi, bins = generate_empircal_lf(
         abs_mags,
@@ -523,9 +523,7 @@ def abundance_match_halo_masses(
 
     matched_masses = lf_to_hmf_match(abs_mags, phi, bins, hmf_masses, dn_dlogM)
 
-    return (
-        matched_masses / 1e14
-    )  # convert to 10^14 h^-1 Msun for consistency with other code
+    return np.log10(matched_masses)
 
 
 @njit
@@ -558,11 +556,11 @@ def linear_stellar_mass2halo_mass(stellar_masses, intercept, slope):
         Slope of the linear relation in log-log space.
     Returns:
     halo_masses : array
-        Estimated halo masses in units of 10^14 h^-1 Msun.
+        Estimated halo masses in units of log10(Msun/h).
     """
     halo_masses = np.empty_like(stellar_masses)
     for i in prange(len(stellar_masses)):
-        halo_masses[i] = 10.0 ** (intercept + slope * np.log10(stellar_masses[i])) / 1e14
+        halo_masses[i] = intercept + slope * np.log10(stellar_masses[i])
     return halo_masses
 
 
@@ -578,11 +576,11 @@ def linear_luminosity2halo_mass(luminosities, intercept, slope):
         Slope of the linear relation in log-log space.
         Returns:
         halo_masses : array
-        Estimated halo masses in units of 10^14 h^-1 Msun.
+        Estimated halo masses in units of log10(Msun/h).
     """
     halo_masses = np.empty_like(luminosities)
     for i in prange(len(luminosities)):
-        halo_masses[i] = 10.0 ** (intercept + slope * np.log10(luminosities[i]*1e14)) / 1e14
+        halo_masses[i] = intercept + slope * np.log10(luminosities[i] * 1e14)
     return halo_masses
 
 
@@ -604,12 +602,12 @@ def red_blue_linear_luminosity2halo_mass(luminosities, central_is_red, intercept
         Slope for blue centrals in log-log space.
         Returns:
         halo_masses : array
-        Estimated halo masses in units of 10^14 h^-1 Msun.
+        Estimated halo masses in units of log10(Msun/h).
     """
     halo_masses = np.empty_like(luminosities)
     for i in prange(len(luminosities)):
         if central_is_red[i]:
-            halo_masses[i] = 10.0 ** (intercept_red + slope_red * np.log10(luminosities[i] * 1e14)) / 1e14
+            halo_masses[i] = intercept_red + slope_red * np.log10(luminosities[i] * 1e14)
         else:
-            halo_masses[i] = 10.0 ** (intercept_blue + slope_blue * np.log10(luminosities[i] * 1e14)) / 1e14
+            halo_masses[i] = intercept_blue + slope_blue * np.log10(luminosities[i] * 1e14)
     return halo_masses
