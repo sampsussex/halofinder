@@ -263,6 +263,7 @@ def brightest_galaxy_centers_from_segments(
     centers_z = np.empty(n_groups, np.float64)
     centers_lum = np.empty(n_groups, np.float64)
     group_stellar_mass = np.empty(n_groups, np.float64)
+    group_stellar_mass_3_biggest = np.empty(n_groups, np.float64)
     bcg_mag = np.empty(n_groups, np.float64)
     central_is_red = np.empty(n_groups, np.bool_)
     group_sizes = np.empty(n_groups, np.int64)
@@ -275,6 +276,9 @@ def brightest_galaxy_centers_from_segments(
         # One pass: sum L + find brightest (track original index best_j)
         Lsum = 0.0
         stellar_mass_sum = 0.0
+        m1 = 0.0
+        m2 = 0.0
+        m3 = 0.0
         best_L = -1.0e300
         best_j = -1
 
@@ -282,7 +286,19 @@ def brightest_galaxy_centers_from_segments(
             j = order[k]  # original galaxy index
             Lj = luminosity[j]
             Lsum += Lj
-            stellar_mass_sum += stellar_mass[j]
+            sm = stellar_mass[j]
+            stellar_mass_sum += sm
+
+            if sm >= m1:
+                m3 = m2
+                m2 = m1
+                m1 = sm
+            elif sm >= m2:
+                m3 = m2
+                m2 = sm
+            elif sm > m3:
+                m3 = sm
+
             if Lj > best_L:
                 best_L = Lj
                 best_j = j
@@ -301,6 +317,7 @@ def brightest_galaxy_centers_from_segments(
         )
         centers_lum[i] = Lsum * L_corr
         group_stellar_mass[i] = stellar_mass_sum
+        group_stellar_mass_3_biggest[i] = m1 + m2 + m3
 
     return (
         unique_gids,
@@ -309,6 +326,7 @@ def brightest_galaxy_centers_from_segments(
         centers_z,
         centers_lum,
         group_stellar_mass,
+        group_stellar_mass_3_biggest,
         bcg_mag,
         group_sizes,
         central_is_red,

@@ -21,6 +21,7 @@ from luminosity_mass_funcs import (
     match_hmf_single,
     lf_to_hmf_match,
     update_halo_masses,
+    stellar2halo_mass_van_kampen,
 )
 
 # Cosmology setup
@@ -187,3 +188,23 @@ def test_update_halo_masses_runs_numpy():
     )
 
     assert masses.shape == abs_mags.shape
+
+
+def test_stellar2halo_mass_van_kampen_matches_expected_formula():
+    stellar_mass_3_largest = np.array([1.0e10, 2.0e10])
+
+    masses = stellar2halo_mass_van_kampen(stellar_mass_3_largest)
+
+    A = 46.944
+    M_A = 10.0 ** 10.483
+    beta = 0.249
+    gamma = -0.601
+    expected = np.log10(
+        A
+        * stellar_mass_3_largest
+        * (
+            (stellar_mass_3_largest / M_A) ** beta
+            + (stellar_mass_3_largest / M_A) ** gamma
+        )
+    )
+    np.testing.assert_allclose(masses, expected)
