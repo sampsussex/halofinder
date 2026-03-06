@@ -611,3 +611,25 @@ def red_blue_linear_luminosity2halo_mass(luminosities, central_is_red, intercept
         else:
             halo_masses[i] = intercept_blue + slope_blue * np.log10(luminosities[i] * 1e14)
     return halo_masses
+
+
+@njit
+def stellar2halo_mass_van_kampen(group_stellar_mass_3_largest, A = 46.944, logM_A = 10.483, beta = 0.249, gamma = -0.601):
+    """Van Kampen+2026 relation between stellar mass and halo mass.
+    Parameters:
+    group_stellar_mass_3_largest : array
+        Stellar mass of the 3 largest galaxies in each group in units of h^-1 Msun.
+    A : float
+        Normalization constant (default 46.944).
+    logM_A : float
+        Logarithm of the characteristic mass M_A in units of log10(Msun/h) (default 10.483).
+    beta : float
+        Slope of the low-mass end (default 0.249).
+    gamma : float
+        Slope of the high-mass end (default -0.601).
+    Returns:
+    halo_masses : array
+        Estimated halo masses in units of log10(Msun/h).
+    """
+    M_A = 10.0 ** logM_A
+    return np.log10(A * group_stellar_mass_3_largest * ((group_stellar_mass_3_largest/M_A)**beta+(group_stellar_mass_3_largest/M_A)**gamma))

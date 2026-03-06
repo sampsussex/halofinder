@@ -52,6 +52,7 @@ abundance_match_params:
 shmr_params:
   shmr_slope: 1.21
   shmr_intercept: -0.55
+  method: "Linear" # Linear, van_Kampen
 
 lhmr_params:
   lhmr_slope: 1.465

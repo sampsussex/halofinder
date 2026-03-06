@@ -484,7 +484,7 @@ class HaloFinder:
 
         elif self.mass_assignment_mode == 'lhmr_dynamical_calibrated':
             if self.iteration_counter == 0:
-                self.group_halo_masses = find_all_initial_mass_to_light(self.group_luminosities, 50.0)
+                self.group_halo_masses = find_all_initial_mass_to_light(self.group_luminosities, 100.0)
             else:
                 self.group_halo_masses = linear_luminosity2halo_mass(
                     self.group_luminosities,
@@ -621,7 +621,7 @@ class HaloFinder:
             # Plot dynamical mass vs group luminosity with the fitted relation
             plt.scatter(
                 np.log10(self.group_luminosities * 1e14),
-                np.log10(group_dynamical_masses * 1e14),
+                group_dynamical_masses,
                 s=0.1,
             )
             x = np.linspace(
