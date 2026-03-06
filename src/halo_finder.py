@@ -22,6 +22,7 @@ from luminosity_mass_funcs import (
     generate_hmf,
     abundance_match_halo_masses,
     linear_stellar_mass2halo_mass,
+    stellar2halo_mass_van_kampen,
     linear_luminosity2halo_mass,
     red_blue_linear_luminosity2halo_mass
 )
@@ -112,6 +113,7 @@ class HaloFinder:
 
         self.shmr_slope = shmr_params["shmr_slope"]
         self.shmr_intercept = shmr_params["shmr_intercept"]
+        self.shmr_method = shmr_params.get("method", "linear")
         self.lhmr_slope = lhmr_params["lhmr_slope"]
         self.lhmr_intercept = lhmr_params["lhmr_intercept"]
         self.lhmr_slope_red = red_blue_lhmr_params["lhmr_slope_red"]
@@ -410,6 +412,7 @@ class HaloFinder:
             self.group_centres_z,
             self.group_luminosities,
             self.group_stellar_masses,
+            self.group_stellar_mass_3_biggest,
             self.group_bcg_abs_mag,
             self.group_sizes,
             self.group_bcg_is_red,
@@ -476,7 +479,14 @@ class HaloFinder:
             plt.clf()
 
         if self.mass_assignment_mode == "shmr":
-            self.group_halo_masses = linear_stellar_mass2halo_mass(self.group_stellar_masses, self.shmr_intercept, self.shmr_slope)
+            if self.shmr_method == "van_Kampen":
+                self.group_halo_masses = stellar2halo_mass_van_kampen(self.group_stellar_mass_3_biggest)
+            else:
+                self.group_halo_masses = linear_stellar_mass2halo_mass(
+                    self.group_stellar_masses,
+                    self.shmr_intercept,
+                    self.shmr_slope,
+                )
 
 
         elif self.mass_assignment_mode == 'lhmr':
