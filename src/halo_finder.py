@@ -3,6 +3,7 @@ import numpy as np
 from astropy.table import Table
 from numba_kdtree import KDTree
 import logging
+from pathlib import Path
 import matplotlib.pyplot as plt
 from cosmo_funcs import (
     get_all_comoving_distance,
@@ -27,6 +28,7 @@ from luminosity_mass_funcs import (
     red_blue_linear_luminosity2halo_mass
 )
 from group_finding_funcs import update_group_membership_halofinder
+from halo_p_M_funcs import find_halo_r
 from utils import ConfigReader
 from bijective_matching import s_score
 
@@ -131,6 +133,12 @@ class HaloFinder:
         file_locations = config_reader.get_file_locations()
         self.data_load_path = file_locations["galaxy_catalog_path"]
         self.save_path = file_locations["galaxy_group_path"]
+        default_group_properties_path = (
+            f"{Path(self.save_path).with_suffix('')}_properties.dat"
+        )
+        self.group_properties_save_path = file_locations.get(
+            "group_properties_path", default_group_properties_path
+        )
         self.plot_save_dir = file_locations["plots_dir"]
         self.s_tot_save_path = file_locations["s_tot_path"]
 
@@ -656,6 +664,39 @@ class HaloFinder:
         header = "id_galaxy_sky\tid_finder_group"
         data = np.column_stack((self.gal_ids, self.group_ids))
         np.savetxt(self.save_path, data, header=header)
+
+        logging.info(
+            f"Saving group properties at the location: {self.group_properties_save_path}"
+        )
+        group_radii_mpc = find_halo_r(
+            self.group_halo_masses, self.group_centres_z, self.omega_matter
+        ) / self.h
+        group_properties_header = (
+            "group_id\tgroup_centre_ra_deg\tgroup_centre_dec_deg\tgroup_centre_redshift\t"
+            "group_luminosity_h-2_Lsun\tgroup_stellar_mass_h-2_Msun\t"
+            "group_stellar_mass_3_biggest_h-2_Msun\tgroup_bcg_abs_mag\tgroup_size_galaxies\t"
+            "group_bcg_is_red_bool\tgroup_radius_Mpc"
+        )
+        group_properties_data = np.column_stack(
+            (
+                self.unique_groups,
+                self.group_centres_ra,
+                self.group_centres_dec,
+                self.group_centres_z,
+                self.group_luminosities,
+                self.group_stellar_masses,
+                self.group_stellar_mass_3_biggest,
+                self.group_bcg_abs_mag,
+                self.group_sizes,
+                self.group_bcg_is_red.astype(int),
+                group_radii_mpc,
+            )
+        )
+        np.savetxt(
+            self.group_properties_save_path,
+            group_properties_data,
+            header=group_properties_header,
+        )
 
     def iterate_halo_finder(self):
         self.active_group_ids = None
