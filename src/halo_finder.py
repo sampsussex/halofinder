@@ -31,14 +31,13 @@ from utils import ConfigReader
 from bijective_matching import s_score
 
 # To do list - For MVP
-# 5logh needs to be in magnitudes, which are all in absolute mags
+# 5logh needs to be in magnitudes, which are all in absolute mags 
 # //TODO fix high mass end of hmf (where i always get 1 of the highest possible mass in the hmf range)
 
 
 # For paper
-# Implement completeness correction
+# Implement completeness correction for photo-zs
 # Implement correction for survey edges (could this be related to above?)
-# Think of novel way of adding photo-zs
 
 
 # ------------------------

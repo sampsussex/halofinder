@@ -1,4 +1,3 @@
-# Yang 07/21 groupfinder
 import numpy as np
 from numba import njit, prange, float64, int64
 from cosmo_funcs import (
