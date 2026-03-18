@@ -27,6 +27,7 @@ column_names:
 file_locations:
   galaxy_catalog_path: '/Users/sp624AA/Downloads/mocks/v0.4.0/cut_waves_deep_gals_peturbed_sm.parquet'
   galaxy_group_path: "gal_groups_sharks.dat"
+  group_properties_path: "gal_groups_sharks_properties.dat"
   s_tot_path: "s_tot_sharks.dat"
   plots_dir: "plots/"
 

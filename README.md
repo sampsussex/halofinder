@@ -142,6 +142,7 @@ python src/main.py config_sharks.yaml
 Depending on mode and config, outputs may include:
 
 - group assignment table (`galaxy_group_path`),
+- group properties table (`group_properties_path`, defaults to `<galaxy_group_path>_properties.dat`),
 - mock comparison score output (`s_tot_path` and/or grid CSV),
 - plots in `plots_dir` when `make_plots: True`.
 
