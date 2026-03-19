@@ -139,12 +139,18 @@ class HaloFinder:
         # Get file paths from config
         file_locations = config_reader.get_file_locations()
         self.data_load_path = file_locations["galaxy_catalog_path"]
-        self.save_path = file_locations["galaxy_group_path"]
-        default_group_properties_path = (
-            f"{Path(self.save_path).with_suffix('')}_properties.dat"
-        )
-        self.group_properties_save_path = file_locations.get(
+        configured_group_save_path = Path(file_locations["galaxy_group_path"])
+        self.save_path = str(configured_group_save_path.with_suffix(".parquet"))
+        default_group_properties_path = str(
+            Path(self.save_path).with_suffix("").with_name(
+                f"{Path(self.save_path).with_suffix('').name}_properties"
+            )
+        ) + ".parquet"
+        configured_group_properties_path = file_locations.get(
             "group_properties_path", default_group_properties_path
+        )
+        self.group_properties_save_path = str(
+            Path(configured_group_properties_path).with_suffix(".parquet")
         )
         self.plot_save_dir = file_locations["plots_dir"]
         self.s_tot_save_path = file_locations["s_tot_path"]
@@ -670,9 +676,15 @@ class HaloFinder:
 
     def save_galaxy_groups(self):
         logging.info(f"Saving galaxy groups at the location: {self.save_path}")
-        header = "id_galaxy_sky\tid_finder_group"
-        data = np.column_stack((self.gal_ids, self.group_ids))
-        np.savetxt(self.save_path, data, header=header)
+        galaxy_groups_table = Table(
+            {
+                "galaxy_id": self.gal_ids,
+                "group_id_finder": self.group_ids,
+            }
+        )
+        galaxy_groups_table.write(
+            self.save_path, format="parquet", overwrite=True
+        )
 
         logging.info(
             f"Saving group properties at the location: {self.group_properties_save_path}"
@@ -680,31 +692,25 @@ class HaloFinder:
         group_radii_mpc = find_halo_r(
             self.group_halo_masses, self.group_centres_z, self.omega_matter
         ) / self.h
-        group_properties_header = (
-            "group_id\tgroup_centre_ra_deg\tgroup_centre_dec_deg\tgroup_centre_redshift\t"
-            "group_luminosity_h-2_Lsun\tgroup_stellar_mass_h-2_Msun\t"
-            "group_stellar_mass_3_biggest_h-2_Msun\tgroup_bcg_abs_mag\tgroup_size_galaxies\t"
-            "group_bcg_is_red_bool\tgroup_radius_Mpc"
+        group_properties_table = Table(
+            {
+                "group_id": self.unique_groups,
+                "centre_ra": self.group_centres_ra,
+                "centre_dec": self.group_centres_dec,
+                "centre_redshift": self.group_centres_z,
+                "luminosity": self.group_luminosities,
+                "stellar_mass": self.group_stellar_masses,
+                "stellar_mass_3_biggest": self.group_stellar_mass_3_biggest,
+                "bcg_abs_mag": self.group_bcg_abs_mag,
+                "multiplicity": self.group_sizes,
+                "bcg_is_red": self.group_bcg_is_red,
+                "radius": group_radii_mpc,
+            }
         )
-        group_properties_data = np.column_stack(
-            (
-                self.unique_groups,
-                self.group_centres_ra,
-                self.group_centres_dec,
-                self.group_centres_z,
-                self.group_luminosities,
-                self.group_stellar_masses,
-                self.group_stellar_mass_3_biggest,
-                self.group_bcg_abs_mag,
-                self.group_sizes,
-                self.group_bcg_is_red.astype(int),
-                group_radii_mpc,
-            )
-        )
-        np.savetxt(
+        group_properties_table.write(
             self.group_properties_save_path,
-            group_properties_data,
-            header=group_properties_header,
+            format="parquet",
+            overwrite=True,
         )
 
     def iterate_halo_finder(self):
