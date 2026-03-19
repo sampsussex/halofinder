@@ -14,7 +14,7 @@ from cosmo_funcs import (
 from group_properties_funcs import (
     find_all_initial_mass_to_light,
     brightest_galaxy_centers,
-    brightest_galaxy_centers_fast,
+    get_group_centres,
     calculate_group_dynamical_masses,
     fit_log_luminosity_log_mass_relation,
 )
@@ -105,6 +105,13 @@ class HaloFinder:
         self.mag_limit = finder_options["survey_magnitude_limit"]
         self.abs_mag_sun = finder_options["abs_solar_magnitude_in_band"]
         self.remove_isolated_galaxies = finder_options["remove_isolated_galaxies"]
+        self.centre_definition = finder_options.get("centre_definition", "bcg").lower()
+        if self.centre_definition not in ("bcg", "iter_centre"):
+            raise ValueError(
+                f"Unsupported finder_options.centre_definition='{self.centre_definition}'. "
+                "Expected one of: bcg, iter_centre."
+            )
+        self.centre_definition_code = 0 if self.centre_definition == "bcg" else 1
 
         self.red_a_threshold = threshold_options["red_a_threshold"]
         self.red_b_threshold = threshold_options["red_b_threshold"]
@@ -423,7 +430,7 @@ class HaloFinder:
             self.group_bcg_abs_mag,
             self.group_sizes,
             self.group_bcg_is_red,
-        ) = brightest_galaxy_centers_fast(
+        ) = get_group_centres(
             self.gal_luminosities,
             stellar_mass,
             self.abs_mag,
@@ -438,6 +445,8 @@ class HaloFinder:
             self.mag_limit,
             self.omega_matter,
             self.h,
+            self.abs_mag_sun,
+            self.centre_definition_code,
         )
         logging.info("Group properties and centres updated.")
 

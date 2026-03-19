@@ -230,10 +230,10 @@ def sort_and_build_segments(group_ids):
 
 
 # ------------------------------------------------------------
-# 2) JIT: compute BCG-centred group properties from segments
+# 2) JIT: compute group properties from segments
 # ------------------------------------------------------------
 @njit(parallel=True)
-def brightest_galaxy_centers_from_segments(
+def bcg_centres_from_segments(
     order,
     unique_gids,
     starts,
@@ -333,8 +333,118 @@ def brightest_galaxy_centers_from_segments(
     )
 
 
+@njit(parallel=True)
+def iterative_centres_from_segments(
+    order,
+    unique_gids,
+    starts,
+    ends,
+    luminosity,
+    stellar_mass,
+    abs_mags,
+    is_red,
+    ra,
+    dec,
+    z,
+    phi_star,
+    M_star,
+    alpha,
+    mag_limit,
+    omega_matter,
+    h,
+    abs_mag_sun,
+):
+    """
+    Group-centre properties using iterative centre identification.
+    """
+    n_groups = unique_gids.size
+
+    centers_ra = np.empty(n_groups, np.float64)
+    centers_dec = np.empty(n_groups, np.float64)
+    centers_z = np.empty(n_groups, np.float64)
+    centers_lum = np.empty(n_groups, np.float64)
+    group_stellar_mass = np.empty(n_groups, np.float64)
+    group_stellar_mass_3_biggest = np.empty(n_groups, np.float64)
+    bcg_mag = np.empty(n_groups, np.float64)
+    central_is_red = np.empty(n_groups, np.bool_)
+    group_sizes = np.empty(n_groups, np.int64)
+
+    for i in prange(n_groups):
+        s = starts[i]
+        e = ends[i]
+        n_members = e - s
+        group_sizes[i] = n_members
+
+        member_ra = np.empty(n_members, np.float64)
+        member_dec = np.empty(n_members, np.float64)
+        member_mag = np.empty(n_members, np.float64)
+        member_orig_idx = np.empty(n_members, np.int64)
+
+        Lsum = 0.0
+        stellar_mass_sum = 0.0
+        m1 = 0.0
+        m2 = 0.0
+        m3 = 0.0
+
+        for k in range(n_members):
+            j = order[s + k]
+            member_orig_idx[k] = j
+            member_ra[k] = ra[j]
+            member_dec[k] = dec[j]
+            member_mag[k] = abs_mags[j]
+
+            Lj = luminosity[j]
+            Lsum += Lj
+            sm = stellar_mass[j]
+            stellar_mass_sum += sm
+
+            if sm >= m1:
+                m3 = m2
+                m2 = m1
+                m1 = sm
+            elif sm >= m2:
+                m3 = m2
+                m2 = sm
+            elif sm > m3:
+                m3 = sm
+
+        center_local_idx = calculate_iterative_center_idx(
+            member_ra, member_dec, member_mag, abs_mag_sun
+        )
+        if center_local_idx < 0:
+            center_local_idx = 0
+        center_j = member_orig_idx[center_local_idx]
+
+        cz = z[center_j]
+        centers_ra[i] = ra[center_j]
+        centers_dec[i] = dec[center_j]
+        centers_z[i] = cz
+        bcg_mag[i] = abs_mags[center_j]
+        central_is_red[i] = is_red[center_j]
+
+        L_corr = luminosity_correction_factor(
+            mag_limit, cz, phi_star, M_star, alpha, omega_matter, h
+        )
+        centers_lum[i] = Lsum * L_corr
+        group_stellar_mass[i] = stellar_mass_sum
+        group_stellar_mass_3_biggest[i] = m1 + m2 + m3
+
+    return (
+        unique_gids,
+        centers_ra,
+        centers_dec,
+        centers_z,
+        centers_lum,
+        group_stellar_mass,
+        group_stellar_mass_3_biggest,
+        bcg_mag,
+        group_sizes,
+        central_is_red,
+    )
+
+
 @njit
-def brightest_galaxy_centers_fast(
+def get_group_centres(
     luminosity,
     stellar_mass,
     abs_mags,
@@ -349,12 +459,34 @@ def brightest_galaxy_centers_fast(
     mag_limit,
     omega_matter,
     h,
+    abs_mag_sun,
+    centre_definition_code,
 ):
-    # (Recommended) ensure contiguous dtypes once outside the JIT hot path
-
     order, gid_sorted, unique_gids, starts, ends = sort_and_build_segments(group_ids)
 
-    return brightest_galaxy_centers_from_segments(
+    if centre_definition_code == 1:
+        return iterative_centres_from_segments(
+            order,
+            unique_gids,
+            starts,
+            ends,
+            luminosity,
+            stellar_mass,
+            abs_mags,
+            is_red,
+            ra,
+            dec,
+            z,
+            phi_star,
+            M_star,
+            alpha,
+            mag_limit,
+            omega_matter,
+            h,
+            abs_mag_sun,
+        )
+
+    return bcg_centres_from_segments(
         order,
         unique_gids,
         starts,
@@ -372,6 +504,43 @@ def brightest_galaxy_centers_fast(
         mag_limit,
         omega_matter,
         h,
+    )
+
+
+@njit
+def brightest_galaxy_centers_fast(
+    luminosity,
+    stellar_mass,
+    abs_mags,
+    is_red,
+    ra,
+    dec,
+    z,
+    group_ids,
+    phi_star,
+    M_star,
+    alpha,
+    mag_limit,
+    omega_matter,
+    h,
+):
+    return get_group_centres(
+        luminosity,
+        stellar_mass,
+        abs_mags,
+        is_red,
+        ra,
+        dec,
+        z,
+        group_ids,
+        phi_star,
+        M_star,
+        alpha,
+        mag_limit,
+        omega_matter,
+        h,
+        4.63,
+        0,
     )
 # -----------------------------
 # Numba helpers: stats

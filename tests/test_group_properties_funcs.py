@@ -6,6 +6,7 @@ from group_properties_funcs import (
     find_group_sizes,
     fit_log_luminosity_log_mass_relation,
     brightest_galaxy_centers_fast,
+    get_group_centres,
 )
 
 
@@ -84,3 +85,46 @@ def test_brightest_galaxy_centers_fast_returns_three_biggest_stellar_mass_sum():
 
     assert_allclose(group_stellar_mass, np.array([19.0, 10.0]))
     assert_allclose(group_stellar_mass_3_biggest, np.array([19.0, 10.0]))
+
+
+def test_get_group_centres_iterative_mode_selects_iterative_centre():
+    luminosity = np.array([10.0, 9.0, 1.0])
+    stellar_mass = np.array([8.0, 7.0, 2.0])
+    abs_mags = np.array([-21.0, -20.0, -19.0])
+    is_red = np.array([True, False, True])
+    ra = np.array([0.0, 10.0, 100.0])
+    dec = np.array([0.0, 0.0, 0.0])
+    z = np.array([0.10, 0.11, 0.12])
+    group_ids = np.array([1, 1, 1])
+
+    (
+        _unique_groups,
+        centers_ra,
+        _centers_dec,
+        _centers_z,
+        _centers_lum,
+        _group_stellar_mass,
+        _group_stellar_mass_3_biggest,
+        _bcg_mag,
+        _group_sizes,
+        _central_is_red,
+    ) = get_group_centres(
+        luminosity,
+        stellar_mass,
+        abs_mags,
+        is_red,
+        ra,
+        dec,
+        z,
+        group_ids,
+        0.01,
+        -20.0,
+        -1.0,
+        20.0,
+        0.3,
+        0.7,
+        4.63,
+        1,
+    )
+
+    assert_allclose(centers_ra, np.array([10.0]))
