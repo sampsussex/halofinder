@@ -26,8 +26,8 @@ column_names:
 
 file_locations:
   galaxy_catalog_path: '/Users/sp624AA/Downloads/gama3/groupfinding_gama4_processed.parquet'
-  galaxy_group_path: "gal_groups_sharks_gama.dat"
-  group_properties_path: "gal_groups_sharks_gama_properties.dat"
+  galaxy_group_path: "gal_groups_sharks_gama.parquet"
+  group_properties_path: "gal_groups_sharks_gama_properties.parquet"
   s_tot_path: #"s_tot_sharks_gama_like.dat"
   plots_dir: "plots/"
 
