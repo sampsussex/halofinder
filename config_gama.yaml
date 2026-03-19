@@ -36,6 +36,7 @@ finder_options:
   abs_solar_magnitude_in_band: 4.63 # OmegaCam r-band AB
   max_iterations: 5
   remove_isolated_galaxies: False
+  centre_definition: "bcg" # bcg, iter_centre
 
 threshold_model_params:
   red_a_threshold: 3.1
