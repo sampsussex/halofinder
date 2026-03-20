@@ -20,7 +20,11 @@ from luminosity_mass_funcs import (
     cumulative_hmf,
     match_hmf_single,
     lf_to_hmf_match,
-    update_halo_masses,
+    abundance_match_halo_masses,
+    k_corr,
+    linear_stellar_mass2halo_mass,
+    linear_luminosity2halo_mass,
+    red_blue_linear_luminosity2halo_mass,
     stellar2halo_mass_van_kampen,
 )
 
@@ -97,11 +101,26 @@ def test_histogram_numba_basic():
     np.testing.assert_array_equal(counts, np.array([2, 2]))
 
 
+def test_histogram_numba_with_weights_and_out_of_range_values():
+    x = np.array([-1.0, 0.1, 0.4, 1.6, 3.0])  # -1 and 3 are outside bins
+    bins = np.array([0.0, 1.0, 2.0])
+    weights = np.array([10.0, 1.0, 2.0, 3.0, 10.0])
+    counts = histogram_numba(x, bins, weights=weights)
+    np.testing.assert_allclose(counts, np.array([3.0, 3.0]))
+
+
 def test_integrate_lf_basic():
     bins = np.array([-21, -20, -19])
     phi = np.array([1.0, 2.0])
     n = integrate_lf(phi, bins, -20.5)
     assert n > 0
+
+
+def test_integrate_lf_limit_edge_cases():
+    bins = np.array([-22.0, -21.0, -20.0])
+    phi = np.array([2.0, 4.0])
+    assert integrate_lf(phi, bins, -23.0) == pytest.approx(0.0)
+    assert integrate_lf(phi, bins, -19.5) == pytest.approx(6.0)
 
 
 def test_cumulative_hmf_basic():
@@ -117,6 +136,17 @@ def test_match_hmf_single_basic():
     n_target = 3.5
     M_thresh = match_hmf_single(n_target, masses, dn)
     assert M_thresh >= masses[0] and M_thresh <= masses[-1]
+
+
+def test_match_hmf_single_clamps_to_boundaries():
+    masses = np.array([1.0, 2.0, 4.0, 8.0])
+    dn = np.array([1.0, 0.5, 0.2, 0.1])
+
+    low_mass = match_hmf_single(1e9, masses, dn)
+    high_mass = match_hmf_single(-1.0, masses, dn)
+
+    assert low_mass == pytest.approx(masses[0])
+    assert high_mass == pytest.approx(masses[-1])
 
 
 # Setup a simple cosmology
@@ -164,7 +194,7 @@ def test_lf_to_hmf_match_respects_z_limits():
     assert np.all(np.isfinite(halo_masses))
 
 
-def test_update_halo_masses_runs_numpy():
+def test_abundance_match_halo_masses_runs_numpy():
     abs_mags = np.array([-22, -21])
     zs = np.array([0.1, 0.2])
     k_corrs = np.zeros(2)
@@ -175,7 +205,7 @@ def test_update_halo_masses_runs_numpy():
     omega_matter = 0.3
     h = 0.7
 
-    masses = update_halo_masses(
+    masses = abundance_match_halo_masses(
         abs_mags,
         zs,
         k_corrs,
@@ -188,6 +218,7 @@ def test_update_halo_masses_runs_numpy():
     )
 
     assert masses.shape == abs_mags.shape
+    assert np.all(np.isfinite(masses))
 
 
 def test_stellar2halo_mass_van_kampen_matches_expected_formula():
@@ -208,3 +239,38 @@ def test_stellar2halo_mass_van_kampen_matches_expected_formula():
         )
     )
     np.testing.assert_allclose(masses, expected)
+
+
+def test_k_corr_and_linear_relations():
+    zs = np.array([0.0, 0.1, 0.2])
+    ks = k_corr(zs)
+    assert ks.shape == zs.shape
+
+    stellar = np.array([1e10, 1e11])
+    halo_from_stellar = linear_stellar_mass2halo_mass(stellar, intercept=2.0, slope=1.0)
+    np.testing.assert_allclose(halo_from_stellar, 2.0 + np.log10(stellar))
+
+    luminosities = np.array([1.0, 2.0])  # in 1e14 L_sun/h
+    halo_from_lum = linear_luminosity2halo_mass(luminosities, intercept=1.0, slope=0.5)
+    np.testing.assert_allclose(
+        halo_from_lum, 1.0 + 0.5 * np.log10(luminosities * 1e14)
+    )
+
+    central_is_red = np.array([True, False])
+    halo_rb = red_blue_linear_luminosity2halo_mass(
+        luminosities,
+        central_is_red,
+        intercept_red=10.0,
+        slope_red=1.0,
+        intercept_blue=11.0,
+        slope_blue=2.0,
+    )
+    np.testing.assert_allclose(
+        halo_rb,
+        np.array(
+            [
+                10.0 + np.log10(luminosities[0] * 1e14),
+                11.0 + 2.0 * np.log10(luminosities[1] * 1e14),
+            ]
+        ),
+    )
