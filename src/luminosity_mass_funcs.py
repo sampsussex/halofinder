@@ -614,7 +614,7 @@ def red_blue_linear_luminosity2halo_mass(luminosities, central_is_red, intercept
 
 
 @njit
-def stellar2halo_mass_van_kampen(group_stellar_mass_3_largest, A = 46.944, logM_A = 10.483, beta = 0.249, gamma = -0.601):
+def stellar2halo_mass_van_kampen(group_stellar_mass_3_largest, h, A = 46.944, logM_A = 10.483, beta = 0.249, gamma = -0.601,):
     """Van Kampen+2026 relation between stellar mass and halo mass.
     Parameters:
     group_stellar_mass_3_largest : array
@@ -627,9 +627,15 @@ def stellar2halo_mass_van_kampen(group_stellar_mass_3_largest, A = 46.944, logM_
         Slope of the low-mass end (default 0.249).
     gamma : float
         Slope of the high-mass end (default -0.601).
+    h : float
+        Dimensionless Hubble parameter.
     Returns:
     halo_masses : array
         Estimated halo masses in units of log10(Msun/h).
     """
-    M_A = 10.0 ** logM_A
+    group_stellar_mass_3_largest = group_stellar_mass_3_largest / h  # Convert to Msun for the formula
+    # Scale M_A by h to convert to M_sun
+    h_factor = 0.7 / h # 0.7 is the h used in Van Kampen+2026, so we need to adjust for our h
+
+    M_A = 10.0 ** logM_A * h_factor
     return np.log10(A * group_stellar_mass_3_largest * ((group_stellar_mass_3_largest/M_A)**beta+(group_stellar_mass_3_largest/M_A)**gamma))

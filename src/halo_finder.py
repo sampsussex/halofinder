@@ -234,7 +234,7 @@ class HaloFinder:
         # Extract data using configured column names
         try:
             # Required columns
-            self.gal_ids = np.array(data[column_names["galaxy_id"]], dtype="int32")
+            self.gal_ids = np.array(data[column_names["galaxy_id"]], dtype="int64")
             self.zobs = np.array(data[column_names["redshift"]], dtype="float64")
             self.ra = np.array(data[column_names["ra"]], dtype="float64")
             self.dec = np.array(data[column_names["dec"]], dtype="float64")
@@ -251,7 +251,7 @@ class HaloFinder:
             # Handle group ID - might be same as galaxy ID for some datasets
             if "group_id" in column_names and column_names["group_id"] in data.colnames:
                 self.id_group_sky = np.array(
-                    data[column_names["group_id"]], dtype="int32"
+                    data[column_names["group_id"]], dtype="int64"
                 )
             else:
                 run_options = self.config_reader.get_run_options()
@@ -406,7 +406,7 @@ class HaloFinder:
             len(self.gal_ids), dtype=bool
         )  # No satellites initially
         self.group_ids = np.arange(
-            len(self.gal_ids), dtype="int32"
+            len(self.gal_ids), dtype="int64"
         )  # Each galaxy is its own group initially
         self.iteration_group_membership[str(self.iteration_counter)] = (
             self.group_ids.copy()
@@ -502,7 +502,7 @@ class HaloFinder:
 
         if self.mass_assignment_mode == "shmr":
             if self.shmr_method == "van_Kampen":
-                self.group_halo_masses = stellar2halo_mass_van_kampen(self.group_stellar_mass_3_biggest)
+                self.group_halo_masses = stellar2halo_mass_van_kampen(self.group_stellar_mass_3_biggest, self.h)
             else:
                 self.group_halo_masses = linear_stellar_mass2halo_mass(
                     self.group_stellar_masses,
