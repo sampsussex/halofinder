@@ -638,4 +638,25 @@ def stellar2halo_mass_van_kampen(group_stellar_mass_3_largest, h, A = 46.944, lo
     h_factor = 0.7 / h # 0.7 is the h used in Van Kampen+2026, so we need to adjust for our h
 
     M_A = 10.0 ** logM_A * h_factor
-    return np.log10(A * group_stellar_mass_3_largest * ((group_stellar_mass_3_largest/M_A)**beta+(group_stellar_mass_3_largest/M_A)**gamma))
+    return np.log10((A * group_stellar_mass_3_largest * 
+                    ((group_stellar_mass_3_largest/M_A)**beta+
+                     (group_stellar_mass_3_largest/M_A)**gamma)) * h )
+
+
+@njit
+def stellar2halo_mass_li(group_stellar_mass, h, A = 2.72, alpha=1.04):
+    """Li+2023 relation between stellar mass and halo mass.
+    Parameters:
+    group_stellar_mass : array
+        Stellar mass of the group in units of h^-1 Msun.
+    A : float
+        Normalization constant.
+    alpha : float
+        Power-law slope.
+    Returns:
+    halo_masses : array
+        Estimated halo masses in units of log10(Msun/h).
+    """
+    log_stellar_mass = np.log10(group_stellar_mass)
+    rescaled_norm = 14.15 + np.log10(h) - np.log10(0.7) # I think this is the right way round...
+    return rescaled_norm + (log_stellar_mass - 11.8 - np.log10(A)) / alpha

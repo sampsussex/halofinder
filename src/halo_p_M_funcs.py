@@ -10,14 +10,13 @@ from astropy import units as u
 # OM_L = 0.73 # Dark energy density parameter
 # C = c.value/ 10**3 # in km/s
 # change astropy g to # in (km/s)^2 Mpc/M_sun
-299792.458
 
 # G = G.to((u.km/u.s)**2 * u.Mpc / u.M_sun).value  # in (km/s)^2 Mpc/M_sun 4.300917270036279e-09
 
 
 @njit
 def find_rho_crit(z, omega_matter):
-    """Calculate the critical density at redshift z. Units are in M_sun / Mpc^3.
+    """Calculate the critical density at redshift z. Units are in M_sun h^-2 / Mpc^3.
     Parameters:
     ----------
     z : float
@@ -27,7 +26,7 @@ def find_rho_crit(z, omega_matter):
     Returns:
     -------
     float
-        Critical density at redshift z in M_sun / Mpc^3
+        Critical density at redshift z in M_sun h^-2 / Mpc^3 
     """
     G = 4.300917270036279e-09  # G constant in (km/s)^2 Mpc/M_sun
     return 3.0 * Hubble(z, omega_matter) ** 2 / (8.0 * np.pi * G)
@@ -104,7 +103,6 @@ def find_concentration_ratio(
 
     if concentraion_relation == "DuttonMaccio14":
         # Dutton Maccio 24 relation, scales with z. https://arxiv.org/pdf/1402.7073
-        # What is going on with H here?
         if delta_crit != 200.0:
             raise ValueError("delta_cirt must be 200 for this implementation")
         a = 0.520 + (0.905 - 0.520) * np.exp(-0.617 * (z**1.21))
@@ -125,13 +123,13 @@ def find_scale_radius(halo_r, halo_concentration):
     Parameters:
     ----------
     halo_r : float
-        Halo radius in units of Mpc
+        Halo radius in units of Mpc h -1
     halo_concentration : float
         Halo concentration ratio (dimensionless)
     Returns:
     -------
     float
-        Scale radius of halo in units of Mpc
+        Scale radius of halo in units of Mpc h -1
 
     """
     return halo_r / halo_concentration
@@ -181,7 +179,7 @@ def find_NFW_sigma(projected_sep, halo_mass, z_group, omega_matter):
     Parameters:
     ----------
     projected_sep : float
-        Projected separation in Mpc
+        Projected separation in Mpc h -1
     halo_mass : float
         Halo mass in units of log10(Msun/h)
     z_group : float
@@ -191,7 +189,7 @@ def find_NFW_sigma(projected_sep, halo_mass, z_group, omega_matter):
     Returns:
     -------
     float
-        NFW sigma in Mpc
+        NFW sigma in Mpc h -1
 
     """
     # Find NFW sigma
@@ -233,6 +231,9 @@ def find_sigma_sqr(halo_mass, z_group, omega_matter, delta_crit=200.0):
     """
     # return 632*(halo_mass*OM_M)**0.3224- old version from Yang+2021
     # Included the correct 3/5 prefactor from viral theorm
+    # What is going on with h? I want to return in km/s
+    # Halo mass is in log10(Msun/h)
+
     G = 4.300917270036279e-09  # G constant in (km/s)^2 Mpc/M_sun
     return (
         ((6 ** (2 / 3)) / 5)
@@ -242,8 +243,8 @@ def find_sigma_sqr(halo_mass, z_group, omega_matter, delta_crit=200.0):
         * (1 + z_group)
         * (
             delta_crit
-            * find_rho_crit(z_group, omega_matter)
-            * find_Om(z_group, omega_matter)
+            * find_rho_crit(z_group, omega_matter) # in M_sun h^-1 / Mpc^3
+            * find_Om(z_group, omega_matter) # dimensionless
         )
         ** (1 / 3)
     )
@@ -316,7 +317,7 @@ def find_p_M(ra1, dec1, ra2, dec2, z_group, z_gal, group_halo_mass, omega_matter
     # else:
     projected_sep = find_projected_separation(
         ra1, dec1, ra2, dec2, z_group, omega_matter
-    )
+    ) # in Mpc h ^-1
 
     delta_z = find_delta_z(z_gal, z_group)
 

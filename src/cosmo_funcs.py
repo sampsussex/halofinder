@@ -90,7 +90,7 @@ def get_all_comoving_distance(z_array, omega_matter):
         omega_matter (float): Matter density parameter at z=0
 
     Returns:
-        array(float): Comoving distance in Mpc
+        array(float): Comoving distance in Mpc h^-1
     """
 
     dms = np.zeros(len(z_array))
@@ -344,7 +344,7 @@ def spherical_to_cartesian(ra, dec, comoving_distance):
     Returns:
     -------
     numpy.ndarray
-        1D array with x, y, z coordinates
+        1D array with x, y, z coordinates in Mpc h^-1
     """
     ra_rad = np.deg2rad(ra)
     dec_rad = np.deg2rad(dec)
@@ -378,7 +378,7 @@ def find_all_spherical_to_cartesian(ra, dec, comoving_distance):
     Returns:
     -------
     numpy.ndarray
-        Array of shape (n, 3) with x, y, z coordinates
+        Array of shape (n, 3) with x, y, z coordinates in Mpc h^-1 for n points
     """
     n = len(ra)
     all_coords = np.zeros((n, 3))

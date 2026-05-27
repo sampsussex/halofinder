@@ -23,6 +23,7 @@ column_names:
   group_id: "id_fof"
   galaxy_is_red: "is_red"
   stellar_mass: "stellar_mass"
+  completeness: "completeness"
 
 file_locations:
   galaxy_catalog_path: '/Users/sp624AA/Downloads/mocks/gama_like_from_groupfinding_cat.parquet'
@@ -39,9 +40,9 @@ finder_options:
   centre_definition: "bcg" # bcg, iter_centre
 
 threshold_model_params:
-  red_a_threshold: 3.1
+  red_a_threshold: 2.5
   red_b_threshold: 0.0
-  blue_a_threshold: 3.1
+  blue_a_threshold: 2.5
   blue_b_threshold: 0.
   threshold_b_pivot: 13.0
 
@@ -54,7 +55,7 @@ abundance_match_params:
 shmr_params:
   shmr_slope: 1.21
   shmr_intercept: -0.55
-  method: "van_Kampen" # Linear, van_Kampen
+  method: "Li" # Linear, van_Kampen, Li
 
 lhmr_params:
   lhmr_slope: 1.465
