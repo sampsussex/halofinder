@@ -119,6 +119,9 @@ class HaloFinder:
         self.blue_a_threshold = threshold_options["blue_a_threshold"]
         self.blue_b_threshold = threshold_options["blue_b_threshold"]
         self.threshold_b_pivot = threshold_options["threshold_b_pivot"]
+        self.completeness_coefficient = threshold_options.get(
+            "completeness_coefficient", 0.0
+        )
 
         self.shmr_slope = shmr_params["shmr_slope"]
         self.shmr_intercept = shmr_params["shmr_intercept"]
@@ -195,6 +198,7 @@ class HaloFinder:
             self.h,
             self.remove_isolated_galaxies,
             self.mass_assignment_mode,
+            self.config_reader.get_column_names().get("completeness"),
         )
 
     def _get_cache(self):
@@ -219,6 +223,7 @@ class HaloFinder:
             self.abs_mag = cached["abs_mag"].copy()
             self.k_corr = cached["k_corr"].copy()
             self.is_red = cached["is_red"].copy()
+            self.completeness = cached["completeness"].copy()
             if self.mass_assignment_mode == "shmr":
                 self.stellar_mass = cached["stellar_mass"].copy()
             self.id_group_sky = cached["id_group_sky"].copy()
@@ -244,6 +249,13 @@ class HaloFinder:
             )
             self.k_corr = np.array(data[column_names["k_correction"]], dtype="float64")
             self.is_red = np.array(data[column_names["galaxy_is_red"]], dtype=bool)
+            completeness_column = column_names.get("completeness")
+            if completeness_column is None:
+                self.completeness = np.ones(len(self.gal_ids), dtype="float64")
+            else:
+                self.completeness = np.array(
+                    data[completeness_column], dtype="float64"
+                )
             if self.mass_assignment_mode == "shmr":
                 self.stellar_mass = np.array(
                     data[column_names["stellar_mass"]], dtype="float64"
@@ -277,6 +289,7 @@ class HaloFinder:
                 self.id_group_sky = self.id_group_sky[mask]
                 self.k_corr = self.k_corr[mask]
                 self.is_red = self.is_red[mask]
+                self.completeness = self.completeness[mask]
                 if self.mass_assignment_mode == "shmr":
                     self.stellar_mass = self.stellar_mass[mask]
                 logging.info(
@@ -303,6 +316,7 @@ class HaloFinder:
                 "abs_mag": self.abs_mag.copy(),
                 "k_corr": self.k_corr.copy(),
                 "is_red": self.is_red.copy(),
+                "completeness": self.completeness.copy(),
                 "id_group_sky": self.id_group_sky.copy(),
             }
             if self.mass_assignment_mode == "shmr":
@@ -586,6 +600,7 @@ class HaloFinder:
                 self.ra,
                 self.dec,
                 self.zobs,
+                self.completeness,
                 self.group_ids,
                 self.unique_groups,
                 self.group_centres_ra,
@@ -604,6 +619,7 @@ class HaloFinder:
                 self.threshold_b_pivot,
                 self.omega_matter,
                 self.h,
+                self.completeness_coefficient,
                 active_group_ids,
                 use_active_groups,
             )
@@ -886,6 +902,7 @@ class RunHaloFinder(HaloFinder):
         logging.info(f"Red b threshold: {self.red_b_threshold}")
         logging.info(f"Blue a threshold: {self.blue_a_threshold}")
         logging.info(f"Blue b threshold: {self.blue_b_threshold}")
+        logging.info(f"Completeness coefficient: {self.completeness_coefficient}")
         self.iterate_halo_finder()
         if self.run_mock_comparion == True:
             self.s_score()
@@ -908,6 +925,7 @@ class RunHaloFinder(HaloFinder):
         logging.info(f"Red b threshold: {self.red_b_threshold}")
         logging.info(f"Blue a threshold: {self.blue_a_threshold}")
         logging.info(f"Blue b threshold: {self.blue_b_threshold}")
+        logging.info(f"Completeness coefficient: {self.completeness_coefficient}")
         self.iterate_halo_finder()
         if self.run_mock_comparion == True:
             self.s_score()

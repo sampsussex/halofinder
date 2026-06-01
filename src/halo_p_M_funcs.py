@@ -330,3 +330,37 @@ def find_p_M(ra1, dec1, ra2, dec2, z_group, z_gal, group_halo_mass, omega_matter
         * find_NFW_sigma(projected_sep, group_halo_mass, z_group, omega_matter)
         * find_p_delta_z(delta_z, z_group, group_halo_mass, omega_matter)
     )
+
+
+@njit
+def find_p_M_with_completeness(
+    ra1,
+    dec1,
+    ra2,
+    dec2,
+    z_group,
+    z_gal,
+    group_halo_mass,
+    omega_matter,
+    h,
+    completeness,
+    completeness_coefficient,
+):
+    """Return P_M weighted by the candidate galaxy completeness.
+
+    The unweighted membership probability is scaled as
+    ``P_M / completeness**completeness_coefficient``. A coefficient of 0.0
+    or a completeness of 1.0 leaves the original probability unchanged.
+    """
+    p_M = find_p_M(
+        ra1,
+        dec1,
+        ra2,
+        dec2,
+        z_group,
+        z_gal,
+        group_halo_mass,
+        omega_matter,
+        h,
+    )
+    return p_M * (1.0 / completeness**completeness_coefficient)

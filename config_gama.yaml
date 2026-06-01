@@ -23,6 +23,7 @@ column_names:
   group_id: #"id_fof"
   galaxy_is_red: "is_red"
   stellar_mass: "stellar_mass" # in units of log10(Msun/h)
+  completeness: null
 
 file_locations:
   galaxy_catalog_path: '/Users/sp624AA/Downloads/gama3/groupfinding_gama4_processed.parquet'
@@ -44,6 +45,7 @@ threshold_model_params:
   blue_a_threshold: 3.2
   blue_b_threshold: 0.
   threshold_b_pivot: 13.0
+  completeness_coefficient: 0.0
 
 abundance_match_params:
   hmf_min_mass: 10

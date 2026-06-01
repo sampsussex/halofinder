@@ -5,7 +5,7 @@ from cosmo_funcs import (
     find_all_spherical_to_cartesian,
     spherical_to_cartesian,
 )
-from halo_p_M_funcs import find_p_M
+from halo_p_M_funcs import find_p_M_with_completeness
 
 
 @njit
@@ -21,6 +21,8 @@ def halo_mass_dependent_threshold(log_halo_mass, a, b, b_piv):
         float64[:],
         float64[:],
         float64[:],
+        float64[:],
+        float64,
         float64,
         float64,
         float64,
@@ -36,12 +38,14 @@ def compute_probabilities_parallel(
     galaxy_ra,
     galaxy_dec,
     galaxy_z,
+    galaxy_completeness,
     group_ra_i,
     group_dec_i,
     group_z_i,
     group_halo_mass_i,
     omega_matter,
     h,
+    completeness_coefficient,
 ):
     """Helper function to compute probabilities in parallel"""
     probs = np.zeros(len(indices), dtype=np.float64)
@@ -49,7 +53,7 @@ def compute_probabilities_parallel(
     for j in prange(len(indices)):
         neighbor_idx = indices[j]
         if neighbor_idx != central_idx:
-            probs[j] = find_p_M(
+            probs[j] = find_p_M_with_completeness(
                 galaxy_ra[neighbor_idx],
                 galaxy_dec[neighbor_idx],
                 group_ra_i,
@@ -59,6 +63,8 @@ def compute_probabilities_parallel(
                 group_halo_mass_i,
                 omega_matter,
                 h,
+                galaxy_completeness[neighbor_idx],
+                completeness_coefficient,
             )
         else:
             probs[j] = -1.0
@@ -71,6 +77,7 @@ def update_group_membership_halofinder(
     galaxy_ra,
     galaxy_dec,
     galaxy_z,
+    galaxy_completeness,
     galaxy_group_id,
     group_ids,
     group_ra,
@@ -89,6 +96,7 @@ def update_group_membership_halofinder(
     b_piv,
     omega_matter,
     h,
+    completeness_coefficient,
     active_group_ids,
     use_active_groups,
 ):
@@ -203,12 +211,14 @@ def update_group_membership_halofinder(
             galaxy_ra,
             galaxy_dec,
             galaxy_z,
+            galaxy_completeness,
             group_ra[group_idx],
             group_dec[group_idx],
             group_z[group_idx],
             group_halo_mass[group_idx],
             omega_matter,
             h,
+            completeness_coefficient,
         )
 
         # Apply membership updates (sequential)

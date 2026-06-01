@@ -13,8 +13,14 @@ def run_single(config_reader):
     return halo_finder
 
 
+def should_tune_completeness(config_reader):
+    """Tune completeness only when a completeness input column is configured."""
+    return config_reader.get_column_names().get("completeness") is not None
+
+
 def optimize_on_mock(config_reader):
     threshold_options = config_reader.get_threshold_model_params()
+    tune_completeness = should_tune_completeness(config_reader)
     initial_params = [
         threshold_options["red_a_threshold"],
         threshold_options["red_b_threshold"],
@@ -29,23 +35,27 @@ def optimize_on_mock(config_reader):
         (-4.0, 0.1),  # blue_b_threshold
     ]
 
+    if tune_completeness:
+        initial_params.append(threshold_options.get("completeness_coefficient", 0.0))
+        bounds.append((0.0, 4.0))  # completeness_coefficient
+
     def objective_function(params):
-        (
-            red_a,
-            red_b,
-            blue_a,
-            blue_b,
-        ) = params
+        red_a, red_b, blue_a, blue_b = params[:4]
         halo_finder = RunHaloFinder(config_reader)
         halo_finder.red_a_threshold = red_a
         halo_finder.red_b_threshold = red_b
         halo_finder.blue_a_threshold = blue_a
         halo_finder.blue_b_threshold = blue_b
-        print(
+        if tune_completeness:
+            halo_finder.completeness_coefficient = params[4]
+        message = (
             "Optimising params: "
             f"red_a={red_a:.4f}, red_b={red_b:.4f}, "
             f"blue_a={blue_a:.4f}, blue_b={blue_b:.4f}"
         )
+        if tune_completeness:
+            message += f", completeness_coefficient={params[4]:.4f}"
+        print(message)
         halo_finder.run()
         return -halo_finder.s_tot
 
@@ -55,6 +65,7 @@ def optimize_on_mock(config_reader):
 
 
 def grid_search_on_mock(config_reader, num_points=1000):
+    tune_completeness = should_tune_completeness(config_reader)
     bounds = [
         (1, 4),  # red_a_threshold
         (-3, 0.1),  # red_b_threshold
@@ -67,6 +78,9 @@ def grid_search_on_mock(config_reader, num_points=1000):
         "blue_a_threshold",
         "blue_b_threshold",
     ]
+    if tune_completeness:
+        bounds.append((0.0, 4.0))  # completeness_coefficient
+        param_names.append("completeness_coefficient")
 
     file_locations = config_reader.get_file_locations()
     results_path = f"{file_locations['s_tot_path']}_grid.csv"
@@ -93,7 +107,9 @@ def grid_search_on_mock(config_reader, num_points=1000):
                 halo_finder.red_b_threshold,
                 halo_finder.blue_a_threshold,
                 halo_finder.blue_b_threshold,
-            ) = params
+            ) = params[:4]
+            if tune_completeness:
+                halo_finder.completeness_coefficient = params[4]
             halo_finder.run()
             row = ",".join(
                 [
