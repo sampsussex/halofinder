@@ -21,6 +21,7 @@ def test_config_reader_loads_sections(tmp_path):
                     "blue_a_threshold": 1.2,
                     "blue_b_threshold": -0.3,
                     "threshold_b_pivot": 13.0,
+                    "completeness_coefficient": 1.5,
                 },
                 "abundance_match_params": {"m_min": 10.0},
                 "shmr_params": {"shmr_slope": 1.1, "shmr_intercept": -0.2},
@@ -50,6 +51,7 @@ def test_config_reader_loads_sections(tmp_path):
     assert reader.get_finder_options() == {"threads": 2}
     assert reader.get_hmf_options() == {"m_min": 10.0}
     assert reader.get_threshold_model_params()["red_a_threshold"] == 1.0
+    assert reader.get_threshold_model_params()["completeness_coefficient"] == 1.5
     assert reader.get_shmr_params()["shmr_slope"] == 1.1
     assert reader.get_lhmr_params()["lhmr_intercept"] == -3.0
     assert reader.get_red_blue_lhmr_params()["lhmr_slope_red"] == 1.4
