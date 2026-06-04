@@ -10,7 +10,7 @@ cosmology:
   h: 0.6751
   omega_matter: 0.3
 
-survey_fractional_sky_area: 0.0012
+survey_fractional_sky_area: 0.027 #0.0012
 
 column_names:
   galaxy_id: "id_galaxy_sky"
@@ -26,14 +26,14 @@ column_names:
   completeness:
 
 file_locations:
-  galaxy_catalog_path: '/its/home/sp624/groupfinding/competition_mocks/train_deep.parquet'
+  galaxy_catalog_path: '/its/home/sp624/groupfinding/competition_mocks/train_wide.parquet'
   galaxy_group_path: "gal_groups_sharks_wide.parquet"
-  group_properties_path: "gal_groups_sharks_properties_deep.parquet"
+  group_properties_path: "gal_groups_sharks_properties_wide.parquet"
   s_tot_path: "s_tot_sharks.dat"
   plots_dir: "plots/"
 
 finder_options:
-  survey_magnitude_limit: 21.25
+  survey_magnitude_limit: 21.1
   abs_solar_magnitude_in_band: 4.51
   max_iterations: 5
   remove_isolated_galaxies: False
@@ -56,7 +56,7 @@ abundance_match_params:
 shmr_params:
   shmr_slope: 1.21
   shmr_intercept: -0.55
-  method: "Li" # Linear, van_Kampen, Li
+  method: "van_Kampen" # Linear, van_Kampen, Li
 
 lhmr_params:
   lhmr_slope: 1.465

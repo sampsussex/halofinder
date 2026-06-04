@@ -3,14 +3,14 @@ run_options:
   run_mock_comparison: True
   optimse_on_mock: True
   optimse_parameter_space: False
-  make_plots: True
+  make_plots: False
   mode: "shmr" # abundance_match, shmr, lhmr, red_blue_lhmr, lhmr_dynamical_calibrated
 
 cosmology:
   h: 0.6751
   omega_matter: 0.3
 
-survey_fractional_sky_area: 0.0012
+survey_fractional_sky_area: 0.027 #0.0012
 
 column_names:
   galaxy_id: "id_galaxy_sky"
@@ -26,7 +26,7 @@ column_names:
   completeness:
 
 file_locations:
-  galaxy_catalog_path: '/Users/sp624AA/Downloads/groupfinding_comp_mocks/train_wide.parquet'
+  galaxy_catalog_path: '/its/home/sp624/groupfinding/competition_mocks/train_wide.parquet'
   galaxy_group_path: "gal_groups_sharks_wide.parquet"
   group_properties_path: "gal_groups_sharks_properties_wide.parquet"
   s_tot_path: "s_tot_sharks.dat"
@@ -42,7 +42,7 @@ finder_options:
 threshold_model_params:
   red_a_threshold: 1.7 #1.7
   red_b_threshold: 0.
-  blue_a_threshold: 2 # 2.9
+  blue_a_threshold: 2.9 # 2.9
   blue_b_threshold: 0.
   threshold_b_pivot: 13.0
   completeness_coefficient: 0.0
