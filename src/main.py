@@ -1,11 +1,9 @@
 from utils import ConfigReader
 from halo_finder import RunHaloFinder
-from scipy.optimize import minimize
 import itertools
 import numpy as np
 import os
 import sys
-
 
 def run_single(config_reader):
     halo_finder = RunHaloFinder(config_reader)
@@ -18,50 +16,107 @@ def should_tune_completeness(config_reader):
     return config_reader.get_column_names().get("completeness") is not None
 
 
-def optimize_on_mock(config_reader):
-    threshold_options = config_reader.get_threshold_model_params()
-    tune_completeness = should_tune_completeness(config_reader)
-    initial_params = [
-        threshold_options["red_a_threshold"],
-        threshold_options["red_b_threshold"],
-        threshold_options["blue_a_threshold"],
-        threshold_options["blue_b_threshold"],
-    ]
+import math
 
-    bounds = [
-        (0.1, 4),  # red_a_threshold
-        (-4.0, 0.1),  # red_b_threshold
-        (0.1, 4),  # blue_a_threshold
-        (-4.0, 0.1),  # blue_b_threshold
-    ]
 
-    if tune_completeness:
-        initial_params.append(threshold_options.get("completeness_coefficient", 0.0))
-        bounds.append((0.0, 4.0))  # completeness_coefficient
+def round_sig(x, sig=2):
+    if x == 0:
+        return 0.0
+    magnitude = int(math.floor(math.log10(abs(x))))
+    return round(x, -magnitude + (sig - 1))
 
-    def objective_function(params):
-        red_a, red_b, blue_a, blue_b = params[:4]
-        halo_finder = RunHaloFinder(config_reader)
-        halo_finder.red_a_threshold = red_a
-        halo_finder.red_b_threshold = red_b
-        halo_finder.blue_a_threshold = blue_a
-        halo_finder.blue_b_threshold = blue_b
-        if tune_completeness:
-            halo_finder.completeness_coefficient = params[4]
-        message = (
-            "Optimising params: "
-            f"red_a={red_a:.4f}, red_b={red_b:.4f}, "
-            f"blue_a={blue_a:.4f}, blue_b={blue_b:.4f}"
-        )
-        if tune_completeness:
-            message += f", completeness_coefficient={params[4]:.4f}"
-        print(message)
-        halo_finder.run()
-        return -halo_finder.s_tot
 
-    return minimize(
-        objective_function, initial_params, bounds=bounds, method="Nelder-Mead"
+def golden_section_search(objective, low, high, tol=0.01):
+    gr = (math.sqrt(5) + 1) / 2
+    cache = {}
+
+    def f(x):
+        x_r = round_sig(x)
+        if x_r not in cache:
+            cache[x_r] = objective(x_r)
+        return cache[x_r]
+
+    a, b = low, high
+    c = b - (b - a) / gr
+    d = a + (b - a) / gr
+
+    while abs(b - a) > tol:
+        if f(c) < f(d):
+            b = d
+        else:
+            a = c
+        c = b - (b - a) / gr
+        d = a + (b - a) / gr
+
+    return round_sig((a + b) / 2)
+
+
+def run_finder(config_reader, blue_a, red_a, completeness=None):
+    halo_finder = RunHaloFinder(config_reader)
+    halo_finder.blue_a_threshold = blue_a
+    halo_finder.red_a_threshold  = red_a
+    halo_finder.blue_b_threshold = 0.0
+    halo_finder.red_b_threshold  = 0.0
+    if completeness is not None:
+        halo_finder.completeness_coefficient = completeness
+    print(
+        f"  blue_a={blue_a:.4f}, red_a={red_a:.4f}"
+        + (f", completeness={completeness:.4f}" if completeness is not None else "")
     )
+    halo_finder.run()
+    return -halo_finder.s_tot
+
+
+def optimize_on_mock(config_reader):
+    tune_completeness = should_tune_completeness(config_reader)
+
+    # ----------------------------------------------------------------
+    # Initial values — edit these to change starting search ranges
+    # ----------------------------------------------------------------
+    BLUE_A_INITIAL = 2.0  # used as the fixed default during Stage 1
+    RED_A_INITIAL  = 2.0  # used as the fixed default during Stage 1
+
+    BLUE_A_BOUNDS       = (0.1, 4.0)
+    RED_A_BOUNDS        = (0.1, 4.0)
+    COMPLETENESS_BOUNDS = (0.0, 1.0)
+    # ----------------------------------------------------------------
+
+    # Stage 1 — optimise blue_a, red_a held at its initial value
+    print("Stage 1: optimising blue_a_threshold...")
+    blue_a = golden_section_search(
+        lambda v: run_finder(config_reader, blue_a=v, red_a=RED_A_INITIAL),
+        *BLUE_A_BOUNDS
+    )
+    print(f"  → blue_a_threshold = {blue_a}")
+
+    # Stage 2 — optimise red_a, blue_a fixed at Stage 1 result
+    print("Stage 2: optimising red_a_threshold...")
+    red_a = golden_section_search(
+        lambda v: run_finder(config_reader, blue_a=blue_a, red_a=v),
+        *RED_A_BOUNDS
+    )
+    print(f"  → red_a_threshold = {red_a}")
+
+    # Stage 3 — optimise completeness, both a_thresholds fixed
+    completeness = None
+    if tune_completeness:
+        print("Stage 3: optimising completeness_coefficient...")
+        completeness = golden_section_search(
+            lambda v: run_finder(config_reader, blue_a=blue_a, red_a=red_a, completeness=v),
+            *COMPLETENESS_BOUNDS
+        )
+        print(f"  → completeness_coefficient = {completeness}")
+
+    print(f"\nFinal: blue_a={blue_a}, red_a={red_a}"
+          + (f", completeness={completeness}" if completeness is not None else ""))
+
+    return {
+        "blue_a_threshold":       blue_a,
+        "red_a_threshold":        red_a,
+        "blue_b_threshold":       0.0,
+        "red_b_threshold":        0.0,
+        **({"completeness_coefficient": completeness} if completeness is not None else {})
+    }
 
 
 def grid_search_on_mock(config_reader, num_points=1000):
