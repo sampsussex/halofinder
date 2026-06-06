@@ -42,12 +42,12 @@ def reformat_sharks(in_filepath, out_filepath, peturbed_stellar_masses=False, re
             'mass_stellar_total', 
             'mass_stellar_disk', 
             'mass_stellar_bulge', 
-            #'mass_virial_hosthalo', 
-            #'mass_virial_subhalo', 
+            'mass_virial_hosthalo', 
+            'mass_virial_subhalo', 
             'sfr_total', 
-            #'id_group_sky', 
+            'id_group_sky', 
             'mag_r_SDSS',
-            #'id_fof', 
+            'id_fof', 
             'masked', 
             'mag_r_VST', 
             'mag_Z_VISTA', 
@@ -62,7 +62,7 @@ def reformat_sharks(in_filepath, out_filepath, peturbed_stellar_masses=False, re
     sharks = pd.read_parquet(in_filepath, columns=cols)
     sharks['mass_stellar_total'] = np.log10(sharks['mass_stellar_total'])
 
-    sharks['log_sSFR'] = sharks['sfr_total'] - sharks['mass_stellar_total']
+    sharks['log_sSFR'] = np.log10(sharks['sfr_total'] + 1e-10) - sharks['mass_stellar_total']
 
 
     print('checking hs in mass stellar total')
@@ -112,7 +112,7 @@ def reformat_sharks(in_filepath, out_filepath, peturbed_stellar_masses=False, re
     sharks['DM'] = cosmo.distmod(sharks['redshift_observed']).value
 
     #data['Rpetro_abs'] = data['Rpetro'] - data['DM'] - data['k-e corr']
-    sharks['k-e corr'] = -sharks['mag_abs_r_VST'] + sharks['mag_r_VST'] - sharks['DM']
+    sharks['k-e corr'] = -sharks['mag_abs_Z_VISTA'] + sharks['mag_Z_VISTA'] - sharks['DM']
 
     # Plot histogram of k-e corr
 
@@ -189,21 +189,18 @@ def main():
     infile_train = '/Users/sp624AA/Downloads/groupfinding_comp_mocks/fibre_incomplete_mocks.parquet'
     infile_comp = '/Users/sp624AA/Downloads/groupfinding_comp_mocks/shark_galaxies_comp.parquet'
 
-    #out_train = '/Users/sp624AA/Downloads/groupfinding_comp_mocks/fibre_incomplete_mocks_reformatted.parquet'
-    #out_comp = '/Users/sp624AA/Downloads/groupfinding_comp_mocks/shark_galaxies_comp_reformatted.parquet'
-
     to_run = ['wide', 'deep']
     masked = True
 
     #out_train
-    #reformat_sharks(infile_train, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/train_wide.parquet', region = 'wide', masked=False)
-    #reformat_sharks(infile_train, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/train_deep.parquet', region = 'deep', masked=False)
+    reformat_sharks(infile_train, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/train_wide.parquet', region = 'wide', masked=False)
+    reformat_sharks(infile_train, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/train_deep.parquet', region = 'deep', masked=False)
 
-    #reformat_sharks(infile_train, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/train_wide_masked.parquet', region = 'wide', masked=True)
-    #reformat_sharks(infile_train, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/train_deep_masked.parquet', region = 'deep', masked=True)
+    reformat_sharks(infile_train, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/train_wide_masked.parquet', region = 'wide', masked=True)
+    reformat_sharks(infile_train, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/train_deep_masked.parquet', region = 'deep', masked=True)
 
-    reformat_sharks(infile_comp, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/comp_wide.parquet', region = 'wide', masked=True)
-    reformat_sharks(infile_comp, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/comp_deep.parquet', region = 'deep', masked=True)
+    #reformat_sharks(infile_comp, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/comp_wide.parquet', region = 'wide', masked=True)
+    #reformat_sharks(infile_comp, '/Users/sp624AA/Downloads/groupfinding_comp_mocks/comp_deep.parquet', region = 'deep', masked=True)
 
 if __name__ == "__main__":
     main()

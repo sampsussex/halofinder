@@ -23,13 +23,13 @@ column_names:
   group_id: "id_fof"
   galaxy_is_red: "is_red"
   stellar_mass: "stellar_mass"
-  completeness:
+  completeness: "completeness"
 
 file_locations:
-  galaxy_catalog_path: '/its/home/sp624/groupfinding/competition_mocks/train_deep.parquet'
+  galaxy_catalog_path: '/its/home/sp624/groupfinding/competition_mocks/train_deep_masked.parquet'
   galaxy_group_path: "gal_groups_sharks_wide.parquet"
   group_properties_path: "gal_groups_sharks_properties_deep.parquet"
-  s_tot_path: "s_tot_sharks.dat"
+  s_tot_path: "s_tot_sharks_deep.dat"
   plots_dir: "plots/"
 
 finder_options:
@@ -40,12 +40,12 @@ finder_options:
   centre_definition: "iter_centre" # bcg, iter_centre
 
 threshold_model_params:
-  red_a_threshold: 1.7 #1.7
+  red_a_threshold: 2. #1.7
   red_b_threshold: 0.
-  blue_a_threshold: 2.9 # 2.9
+  blue_a_threshold: 1.6 # 2.9
   blue_b_threshold: 0.
   threshold_b_pivot: 13.0
-  completeness_coefficient: 0.0
+  completeness_coefficient: 2.0
 
 abundance_match_params:
   hmf_min_mass: 10

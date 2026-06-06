@@ -29,7 +29,7 @@ file_locations:
   galaxy_catalog_path: '/its/home/sp624/groupfinding/competition_mocks/train_wide_masked.parquet'
   galaxy_group_path: "gal_groups_sharks_wide.parquet"
   group_properties_path: "gal_groups_sharks_properties_wide.parquet"
-  s_tot_path: "s_tot_sharks.dat"
+  s_tot_path: "s_tot_sharks_wide.dat"
   plots_dir: "plots/"
 
 finder_options:

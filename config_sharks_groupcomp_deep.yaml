@@ -27,9 +27,9 @@ column_names:
 
 file_locations:
   galaxy_catalog_path: '/its/home/sp624/groupfinding/competition_mocks/train_deep.parquet'
-  galaxy_group_path: "gal_groups_sharks_wide.parquet"
+  galaxy_group_path: "gal_groups_sharks_deep.parquet"
   group_properties_path: "gal_groups_sharks_properties_deep.parquet"
-  s_tot_path: "s_tot_sharks.dat"
+  s_tot_path: "s_tot_sharks_deep.dat"
   plots_dir: "plots/"
 
 finder_options:

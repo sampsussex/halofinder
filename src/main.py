@@ -73,12 +73,12 @@ def optimize_on_mock(config_reader):
     # ----------------------------------------------------------------
     # Initial values — edit these to change starting search ranges
     # ----------------------------------------------------------------
-    BLUE_A_INITIAL = 2.0  # used as the fixed default during Stage 1
-    RED_A_INITIAL  = 2.0  # used as the fixed default during Stage 1
+    BLUE_A_INITIAL = 2.5  # used as the fixed default during Stage 1
+    RED_A_INITIAL  = 1.5  # used as the fixed default during Stage 1
 
     BLUE_A_BOUNDS       = (0.1, 4.0)
     RED_A_BOUNDS        = (0.1, 4.0)
-    COMPLETENESS_BOUNDS = (0.0, 1.0)
+    COMPLETENESS_BOUNDS = (0.0, 2.0)
     # ----------------------------------------------------------------
 
     # Stage 1 — optimise blue_a, red_a held at its initial value
@@ -194,9 +194,9 @@ if __name__ == "__main__":
     if run_options.get("optimse_on_mock"):
         print("Optimising on mock comparison...")
         result = optimize_on_mock(config_reader)
-        best_score = -result.fun
-        print(f"Best score = {best_score:.3f}")
-        print(f"Best parameters = {result.x}")
+        #best_score = -result.fun
+        #print(f"Best score = {best_score:.3f}")
+        #print(f"Best parameters = {result.x}")
     elif run_options.get("optimse_parameter_space"):
         print("Running parameter-space grid search on mock comparison...")
         results_path = grid_search_on_mock(config_reader, num_points=90)

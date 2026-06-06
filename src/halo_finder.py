@@ -26,7 +26,9 @@ from luminosity_mass_funcs import (
     stellar2halo_mass_van_kampen,
     linear_luminosity2halo_mass,
     stellar2halo_mass_li,
-    red_blue_linear_luminosity2halo_mass
+    red_blue_linear_luminosity2halo_mass, 
+    compute_smf_magnitude_limit_empirical_grid, 
+    get_stellar_mass_correction_factors_array
 )
 from group_finding_funcs import update_group_membership_halofinder
 from halo_p_M_funcs import find_halo_r
@@ -34,13 +36,13 @@ from utils import ConfigReader
 from bijective_matching import s_score
 
 # To do list - For MVP
-# 5logh needs to be in magnitudes, which are all in absolute mags 
+# //TODO fix stellar mass assignment as a function of redshift (currently just using one relation for all redshifts, but should be evolving)
 # //TODO fix high mass end of hmf (where i always get 1 of the highest possible mass in the hmf range)
 
 
 # For paper
-# Implement completeness correction for photo-zs
-# Implement correction for survey edges (could this be related to above?)
+# maybe to edge reflection for completeness
+
 
 
 # ------------------------
@@ -409,6 +411,16 @@ class HaloFinder:
         )
         logging.info("Initial halo masses assigned.")
 
+    
+    def generate_smhr_redshift_correction_factor_grid(self):
+        logging.info("Generating SHMR redshift correction factor grid...")
+        self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid = compute_smf_magnitude_limit_empirical_grid(self.zobs, np.log10(self.stellar_mass))
+        logging.info("SHMR redshift correction factor grid generated.")
+        #plt.scatter(self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid)
+        #plt.title('stellarmass com grid')
+        #plt.show()
+
+
     def initial_group_central_satellite_assignment(self):
         """
         Assign all galaxies as centrals in the first iteration.
@@ -516,6 +528,14 @@ class HaloFinder:
             plt.clf()
 
         if self.mass_assignment_mode == "shmr":
+            logging.info('Finding stellar mass correction factor')
+            stellar_mass_corr_factors = get_stellar_mass_correction_factors_array(self.group_centres_z, self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid)
+            #plt.hist(stellar_mass_corr_factors)
+            #plt.title('corr_factor_hist')
+            #plt.show()
+            self.group_stellar_masses = self.group_stellar_masses * stellar_mass_corr_factors
+            
+            logging.info('Stellar mass correction factor found')
             if self.shmr_method == "van_Kampen":
                 self.group_halo_masses = stellar2halo_mass_van_kampen(self.group_stellar_mass_3_biggest, self.h)
 
@@ -576,6 +596,7 @@ class HaloFinder:
             plt.clf()
 
         logging.info("Halo masses updated.")
+
 
     def apply_halo_finder(self):
         logging.info("Performing iteration of group finder")
@@ -789,7 +810,7 @@ class HaloFinder:
 
         self.s_tot = score
         # Save the S-score to a file
-        np.savetxt(self.s_tot_save_path + "_B:", [score], header="S-score", fmt="%.6f")
+        np.savetxt(self.s_tot_save_path + 'b_score.txt', [score], header="S-score", fmt="%.6f")
 
     def debugging_plots(self):
         if not self.make_plots:
@@ -888,6 +909,10 @@ class RunHaloFinder(HaloFinder):
         self.load_catalogue_data()
         if self.mass_assignment_mode == "abundance_match":
             self.generate_hmf()
+        if self.mass_assignment_mode == 'shmr':
+            self.generate_smhr_redshift_correction_factor_grid()
+            
+
         self.get_all_comoving_distances()
         self.create_KDE_tree()
         self.initial_group_central_satellite_assignment()

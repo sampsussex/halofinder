@@ -68,6 +68,207 @@ def luminosity_correction_factor(m_lim, z, phi_star, M_star, alpha, omega_matter
 
     return 1.04 * int_lf_total / int_lf_to_lim
 
+@njit
+def double_schechter_smf(log_M, phi_star1, phi_star2, log_M_star, alpha1, alpha2):
+    """
+    Double Schechter stellar mass function.
+
+    Parameters:
+        log_M      : log10(M / M_sun)  — the integration variable
+        phi_star1  : normalisation of the first Schechter component  [Mpc^-3 dex^-1]
+        phi_star2  : normalisation of the second Schechter component [Mpc^-3 dex^-1]
+        log_M_star : characteristic log-mass  log10(M* / M_sun)
+        alpha1     : faint-end slope of the first component
+        alpha2     : faint-end slope of the second component
+
+    Returns:
+        phi(log_M)  [Mpc^-3 dex^-1]
+
+    Form (per unit dex, already includes the ln(10) factor):
+        phi = ln(10) * exp(-10^(log_M - log_M_star))
+              * [ phi_star1 * (10^(log_M - log_M_star))^(alpha1+1)
+                + phi_star2 * (10^(log_M - log_M_star))^(alpha2+1) ]
+    """
+    ratio = 10.0 ** (log_M - log_M_star)          # M / M*
+    exp_term = np.exp(-ratio)
+    ln10 = np.log(10.0)
+
+    term1 = phi_star1 * ratio ** (alpha1 + 1.0)
+    term2 = phi_star2 * ratio ** (alpha2 + 1.0)
+
+    return ln10 * exp_term * (term1 + term2)
+
+
+@njit
+def double_schechter_smf_mass_weighted(log_M, phi_star1, phi_star2, log_M_star, alpha1, alpha2):
+    phi = double_schechter_smf(log_M, phi_star1, phi_star2, log_M_star, alpha1, alpha2)
+    return phi * 10.0 ** log_M  # extra M factor, converting log_M back to linear
+
+
+@njit
+def simpson_integrate_mass_weighted_smf(
+    a, b,
+    phi_star1, phi_star2, log_M_star, alpha1, alpha2,
+    n=1000
+):
+    if n % 2 == 1:
+        n += 1
+
+    h = (b - a) / n
+    x = np.linspace(a, b, n + 1)
+    y = np.zeros(n + 1)
+
+    for i in range(n + 1):
+        y[i] = double_schechter_smf_mass_weighted(
+            x[i], phi_star1, phi_star2, log_M_star, alpha1, alpha2
+        )
+
+    result = y[0] + y[n]
+    for i in range(1, n, 2):
+        result += 4.0 * y[i]
+    for i in range(2, n, 2):
+        result += 2.0 * y[i]
+
+    return result * h / 3.0
+
+
+def compute_smf_magnitude_limit_empirical_grid(zs, stellar_masses, n_bins=25):
+    """
+    Build a redshift grid and corresponding stellar mass completeness limits
+    empirically from the data.
+
+    For each redshift bin, the limit is taken as the 1st percentile of
+    stellar masses in that bin — i.e. the bottom of the 99th quantile —
+    representing the faintest (least massive) galaxies reliably detected.
+
+    Parameters:
+        zs              : array-like, redshifts of all galaxies in the survey
+        stellar_masses  : array-like, log10(M/M_sun) for each galaxy
+        n_bins          : int, number of redshift bins (default 50)
+
+    Returns:
+        z_grid                    : np.ndarray, shape (n_bins,), bin centres
+        stellarmass_limit_grid    : np.ndarray, shape (n_bins,), 1st percentile
+                                    log stellar mass in each bin
+    """
+    zs              = np.asarray(zs,              dtype=np.float64)
+    stellar_masses  = np.asarray(stellar_masses,  dtype=np.float64)
+
+    z_min = zs.min()
+    z_max = zs.max()
+
+    bin_edges = np.linspace(z_min, z_max, n_bins + 1)
+    bin_centres = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
+    stellarmass_limit_grid = np.zeros(n_bins, dtype=np.float64)
+
+    for i in range(n_bins):
+        in_bin = (zs >= bin_edges[i]) & (zs < bin_edges[i + 1])
+
+        # Close the right edge on the last bin so no galaxies are dropped
+        if i == n_bins - 1:
+            in_bin = (zs >= bin_edges[i]) & (zs <= bin_edges[i + 1])
+
+        masses_in_bin = stellar_masses[in_bin]
+
+        if len(masses_in_bin) == 0:
+            # Empty bin: interpolate later via np.interp's edge-filling.
+            # Flag with NaN so we can fix it in a second pass.
+            stellarmass_limit_grid[i] = np.nan
+        else:
+            # 1st percentile = bottom of the 99th quantile of masses present
+            stellarmass_limit_grid[i] = np.percentile(masses_in_bin, 5.)
+
+    # --- fill any empty bins by linear interpolation over valid neighbours ---
+    valid = np.isfinite(stellarmass_limit_grid)
+    if not valid.all():
+        if valid.any():
+            stellarmass_limit_grid = np.interp(
+                bin_centres,
+                bin_centres[valid],
+                stellarmass_limit_grid[valid]
+            )
+        else:
+            raise ValueError(
+                "All redshift bins are empty — check your zs / stellar_masses inputs."
+            )
+
+    return bin_centres, stellarmass_limit_grid
+
+
+@njit
+def interpolate_smf_magnitude_limit(z_grid, stellarmass_limits, z):
+    """
+    Linear interpolation of the pre-computed stellar mass completeness limit.
+
+    Parameters:
+        z_grid              : 1-D array of redshift bin centres (monotone increasing)
+        stellarmass_limits  : 1-D array of log10(M_lim/M_sun) at each bin centre
+        z                   : redshift at which to evaluate the limit
+
+    Returns:
+        float : log10(M_lim/M_sun) at redshift z
+    """
+    return np.interp(z, z_grid, stellarmass_limits)
+
+
+@njit
+def stellar_mass_correction_factor(z, z_smf_correction_grid, stellarmass_smf_correction_grid,
+    phi_star1 = 10**(-2.437+0.0807), phi_star2 = 10**(-3.201+0.0807),
+    log_M_star = 10.745, alpha1 = -0.466, alpha2 = -1.530,
+    ):
+    """
+    Numba-compiled 1/Vmax-style correction factor using a double Schechter SMF.
+
+    Integrates the SMF from the empirical mass completeness limit to 10^13 M_sun,
+    normalised by the integral over the full mass range, to account for galaxies
+    below the survey detection threshold at redshift z. Defaults for Driver+22 at
+    redshift 0.
+
+    Parameters:
+        z                            : redshift
+        phi_star1                    : first Schechter normalisation  [Mpc^-3 dex^-1]
+        phi_star2                    : second Schechter normalisation [Mpc^-3 dex^-1]
+        log_M_star                   : characteristic log-mass log10(M*/M_sun)
+        alpha1                       : faint-end slope of first component
+        alpha2                       : faint-end slope of second component
+        omega_matter                 : Omega_m at z=0
+        h                            : dimensionless Hubble parameter
+        z_smf_correction_grid        : pre-computed redshift grid (from empirical fn)
+        stellarmass_smf_correction_grid : pre-computed mass limits (from empirical fn)
+
+    Returns:
+        float : correction factor >= 1
+    """
+    log_sm_lim = interpolate_smf_magnitude_limit(
+        z_smf_correction_grid, stellarmass_smf_correction_grid, z
+    )
+
+    int_smf_total = simpson_integrate_mass_weighted_smf(
+        1, 13.0,
+        phi_star1, phi_star2, log_M_star, alpha1, alpha2
+    )
+    int_smf_to_lim = simpson_integrate_mass_weighted_smf(
+        log_sm_lim, 13.0,
+        phi_star1, phi_star2, log_M_star, alpha1, alpha2
+    )
+
+    return int_smf_total / int_smf_to_lim
+
+
+@njit
+def get_stellar_mass_correction_factors_array(
+    zs,
+    z_smf_correction_grid, stellarmass_smf_correction_grid,
+    ):
+    stellarmass_correction_factors = np.zeros_like(zs)
+    for i in prange(len(zs)):
+        stellarmass_correction_factors[i] = stellar_mass_correction_factor(
+            zs[i], z_smf_correction_grid, stellarmass_smf_correction_grid)
+
+    return stellarmass_correction_factors
+   # phi_star1=10**(-2.437+0.0807), phi_star2=10**(-3.201+0.0807), log_M_star=10.745, alpha1=-0.466, alpha2=-1.530,
+
 
 def generate_hmf(hmf_z, m_min, m_max, dlog10m, h, omega_matter):
     """Generate the halo mass function at a given redshift.
