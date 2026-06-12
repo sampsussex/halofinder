@@ -73,11 +73,11 @@ def optimize_on_mock(config_reader):
     # ----------------------------------------------------------------
     # Initial values — edit these to change starting search ranges
     # ----------------------------------------------------------------
-    BLUE_A_INITIAL = 2.5  # used as the fixed default during Stage 1
-    RED_A_INITIAL  = 1.5  # used as the fixed default during Stage 1
+    BLUE_A_INITIAL = 2.  # used as the fixed default during Stage 1
+    RED_A_INITIAL  = 1.  # used as the fixed default during Stage 1
 
-    BLUE_A_BOUNDS       = (0.1, 4.0)
-    RED_A_BOUNDS        = (0.1, 4.0)
+    BLUE_A_BOUNDS       = (1, 3.0)
+    RED_A_BOUNDS        = (0.1, 2.0)
     COMPLETENESS_BOUNDS = (0.0, 2.0)
     # ----------------------------------------------------------------
 

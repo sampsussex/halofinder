@@ -36,9 +36,9 @@ from utils import ConfigReader
 from bijective_matching import s_score
 
 # To do list - For MVP
-# //TODO fix stellar mass assignment as a function of redshift (currently just using one relation for all redshifts, but should be evolving)
 # //TODO fix high mass end of hmf (where i always get 1 of the highest possible mass in the hmf range)
-
+# Need to rejig redsfhit sm boosting to be a look up/interpolation, rather than a direct calculation, to speed up massively. 
+# //TODO logarithmic mean instead of straight mean for group stellar mass. BUG!!!
 
 # For paper
 # maybe to edge reflection for completeness
