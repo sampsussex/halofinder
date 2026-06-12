@@ -23,12 +23,10 @@ column_names:
   group_id: "id_fof"
   galaxy_is_red: "is_red"
   stellar_mass: "stellar_mass"
-  completeness: null
 
 file_locations:
   galaxy_catalog_path: '/Users/sp624AA/Downloads/mocks/v0.4.0/cut_waves_deep_gals_peturbed_sm.parquet'
-  galaxy_group_path: "gal_groups_sharks.parquet"
-  group_properties_path: "gal_groups_sharks_properties.parquet"
+  galaxy_group_path: "gal_groups_sharks.dat"
   s_tot_path: "s_tot_sharks.dat"
   plots_dir: "plots/"
 
@@ -37,7 +35,6 @@ finder_options:
   abs_solar_magnitude_in_band: 4.51
   max_iterations: 5
   remove_isolated_galaxies: False
-  centre_definition: "bcg" # bcg, iter_centre
 
 threshold_model_params:
   red_a_threshold: 1.6
@@ -45,7 +42,6 @@ threshold_model_params:
   blue_a_threshold: 2.1
   blue_b_threshold: 0.
   threshold_b_pivot: 13.0
-  completeness_coefficient: 0.0
 
 abundance_match_params:
   hmf_min_mass: 10
@@ -56,7 +52,7 @@ abundance_match_params:
 shmr_params:
   shmr_slope: 1.21
   shmr_intercept: -0.55
-  method: "Li" # Linear, van_Kampen, Li
+  method: "van_Kampen" # Linear, van_Kampen
 
 lhmr_params:
   lhmr_slope: 1.465
