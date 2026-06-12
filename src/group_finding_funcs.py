@@ -200,7 +200,7 @@ def update_group_membership_halofinder(
 
         # Query nearby galaxies
         query_point = group_coords[group_idx]
-        k = min(500, n_galaxies)
+        k = min(2000, n_galaxies)
         distances, indices, extra = galaxy_tree.query(query_point, k=k)
         flat_indices = indices[0]
 

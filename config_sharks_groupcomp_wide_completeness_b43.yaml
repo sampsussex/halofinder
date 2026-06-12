@@ -42,7 +42,7 @@ finder_options:
 threshold_model_params:
   red_a_threshold: 1.9 #1.7
   red_b_threshold: 0.
-  blue_a_threshold: 4.1 # 2.9
+  blue_a_threshold: 4.3 # 2.9
   blue_b_threshold: 0.
   threshold_b_pivot: 13.0
   completeness_coefficient: 0.35

@@ -1,6 +1,6 @@
 run_options:
-  run_group_finder: False
-  run_mock_comparison: True
+  run_group_finder: True
+  run_mock_comparison: False
   optimse_on_mock: False
   optimse_parameter_space: False
   make_plots: False
@@ -20,15 +20,15 @@ column_names:
   absolute_magnitude: "mag_abs_Z_VISTA"
   apparent_magnitude: "mag_Z_VISTA"
   k_correction: "k-e corr"
-  group_id: "id_fof"
+  group_id: 
   galaxy_is_red: "is_red"
   stellar_mass: "stellar_mass"
   completeness: "completeness"
 
 file_locations:
-  galaxy_catalog_path: /Users/sp624AA/Downloads/groupfinding_comp_mocks/train_wide_masked.parquet #'/its/home/sp624/groupfinding/competition_mocks/train_wide_masked.parquet'
-  galaxy_group_path: "gal_groups_sharks_wide.parquet"
-  group_properties_path: "gal_groups_sharks_properties_wide.parquet"
+  galaxy_catalog_path: "/Users/sp624AA/Downloads/groupfinding_comp_mocks/comp_wide.parquet" #'/its/home/sp624/groupfinding/competition_mocks/train_wide_masked.parquet'
+  galaxy_group_path: "kelpie_galaxy_groups_wide_same_B.parquet"
+  group_properties_path: "kelpie_group_properties_wide_same_B.parquet"
   s_tot_path: "s_tot_sharks_wide.dat"
   plots_dir: "plots/"
 
@@ -40,9 +40,9 @@ finder_options:
   centre_definition: "iter_centre" # bcg, iter_centre
 
 threshold_model_params:
-  red_a_threshold: 1.9 #1.7
+  red_a_threshold: 3.2 #1.7
   red_b_threshold: 0.
-  blue_a_threshold: 4.1 # 2.9
+  blue_a_threshold: 3.2 # 2.9
   blue_b_threshold: 0.
   threshold_b_pivot: 13.0
   completeness_coefficient: 0.35
