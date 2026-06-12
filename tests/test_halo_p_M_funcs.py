@@ -25,6 +25,7 @@ from halo_p_M_funcs import (  # change filename if needed
     find_sigma_sqr,
     find_p_delta_z,
     find_p_M,
+    find_p_M_with_completeness,
 )
 
 RTOL = 5e-3
@@ -53,7 +54,7 @@ def test_find_Om_consistency_with_astropy():
 def test_find_halo_r_and_scale_radius_consistency():
     om = 0.3
     z = 0.5
-    M = 1.0  # in 1e14 h^-1 Msun
+    M = 14.0  # in log10(Msun/h)
     r_halo = find_halo_r(M, z, om)
     c = 5.0
     r_s = find_scale_radius(r_halo, c)
@@ -62,7 +63,7 @@ def test_find_halo_r_and_scale_radius_consistency():
 
 
 def test_concentration_ratio_relations_and_errors():
-    M = 1.0
+    M = 14.0
     z = 0.5
     # Maccio08 should give a finite concentration
     c1 = find_concentration_ratio(M, z, concentraion_relation="Maccio08")
@@ -102,7 +103,7 @@ def test_find_delta_bar_monotonic():
 def test_find_NFW_sigma_symmetry_and_infinity():
     om = 0.3
     z = 0.2
-    M = 1.0
+    M = 14.0
     # Finite projected separation → finite sigma
     sig = find_NFW_sigma(0.1, M, z, om)
     assert np.isfinite(sig)
@@ -113,8 +114,8 @@ def test_find_NFW_sigma_symmetry_and_infinity():
 def test_find_sigma_sqr_scaling():
     om = 0.3
     z = 0.3
-    M1 = 1.0
-    M2 = 2.0
+    M1 = 14.0
+    M2 = 14.3
     sig1 = find_sigma_sqr(M1, z, om)
     sig2 = find_sigma_sqr(M2, z, om)
     assert sig2 > sig1  # larger halo mass → larger velocity dispersion
@@ -123,7 +124,7 @@ def test_find_sigma_sqr_scaling():
 def test_find_p_delta_z_symmetry():
     om = 0.3
     z = 0.3
-    M = 1.0
+    M = 14.0
     dz = 0.01
     p1 = find_p_delta_z(dz, z, M, om)
     p2 = find_p_delta_z(-dz, z, M, om)
@@ -135,10 +136,29 @@ def test_find_p_M_special_cases():
     h = 0.7
     z_group = 0.2
     z_gal = 0.22
-    M = 10.0
+    M = 14.0
     # Coincident group & galaxy → inf
     val_inf = find_p_M(10, 10, 10, 10, z_group, z_group, M, om, h)
     assert np.isinf(val_inf)
     # Offset positions → finite probability
     val = find_p_M(10, 10, 10.1, 10.2, z_group, z_gal, M, om, h)
     assert np.isfinite(val) and val > 0
+
+
+def test_find_p_M_with_completeness_weights_probability():
+    om = 0.3
+    h = 0.7
+    z_group = 0.2
+    z_gal = 0.22
+    M = 14.0
+
+    base = find_p_M(10, 10, 10.1, 10.2, z_group, z_gal, M, om, h)
+    weighted = find_p_M_with_completeness(
+        10, 10, 10.1, 10.2, z_group, z_gal, M, om, h, 0.5, 2.0
+    )
+    unchanged = find_p_M_with_completeness(
+        10, 10, 10.1, 10.2, z_group, z_gal, M, om, h, 0.5, 0.0
+    )
+
+    assert_allclose(weighted, base * 4.0, rtol=1e-12)
+    assert_allclose(unchanged, base, rtol=1e-12)

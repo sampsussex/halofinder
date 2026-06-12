@@ -1,0 +1,81 @@
+run_options:
+  run_group_finder: False
+  run_mock_comparison: True
+  optimse_on_mock: True
+  optimse_parameter_space: False
+  make_plots: False
+  mode: "shmr" # abundance_match, shmr, lhmr, red_blue_lhmr, lhmr_dynamical_calibrated
+
+cosmology:
+  h: 0.6751
+  omega_matter: 0.3
+
+survey_fractional_sky_area: 0.0012
+
+column_names:
+  galaxy_id: "id_galaxy_sky"
+  ra: "ra"
+  dec: "dec"
+  redshift: "redshift_observed"
+  absolute_magnitude: "mag_abs_Z_VISTA"
+  apparent_magnitude: "mag_Z_VISTA"
+  k_correction: "k-e corr"
+  group_id: "id_fof"
+  galaxy_is_red: "is_red"
+  stellar_mass: "stellar_mass"
+  completeness:
+
+file_locations:
+  galaxy_catalog_path: '/its/home/sp624/groupfinding/competition_mocks/train_deep.parquet'
+  galaxy_group_path: "gal_groups_sharks_deep.parquet"
+  group_properties_path: "gal_groups_sharks_properties_deep.parquet"
+  s_tot_path: "s_tot_sharks_deep.dat"
+  plots_dir: "plots/"
+
+finder_options:
+  survey_magnitude_limit: 21.25
+  abs_solar_magnitude_in_band: 4.51
+  max_iterations: 5
+  remove_isolated_galaxies: False
+  centre_definition: "iter_centre" # bcg, iter_centre
+
+threshold_model_params:
+  red_a_threshold: 1.7 #1.7
+  red_b_threshold: 0.
+  blue_a_threshold: 2.9 # 2.9
+  blue_b_threshold: 0.
+  threshold_b_pivot: 13.0
+  completeness_coefficient: 0.0
+
+abundance_match_params:
+  hmf_min_mass: 10
+  hmf_max_mass: 15
+  hmf_redshift: 0.4
+  hmf_dlog10m: 0.01
+
+shmr_params:
+  shmr_slope: 1.21
+  shmr_intercept: -0.55
+  method: "Li" # Linear, van_Kampen, Li
+
+lhmr_params:
+  lhmr_slope: 1.465
+  lhmr_intercept: -3.501
+
+red_blue_lhmr_params:
+  lhmr_slope_red: 1.465
+  lhmr_intercept_red: -3.501
+  lhmr_slope_blue: 1.465
+  lhmr_intercept_blue: -3.501
+
+lhmr_dynamical_calibrated_params:
+  A: 10.0
+  min_group_members: 5
+
+luminosity_function_options:
+  phi_star: 8.717241206267565667e-04
+  M_star: -23.72
+  alpha: -1.39
+
+mock_comparison_options:
+  group_n_threshold: 5

@@ -3,6 +3,7 @@ import numpy as np
 from astropy.table import Table
 from numba_kdtree import KDTree
 import logging
+from pathlib import Path
 import matplotlib.pyplot as plt
 from cosmo_funcs import (
     get_all_comoving_distance,
@@ -13,29 +14,35 @@ from cosmo_funcs import (
 from group_properties_funcs import (
     find_all_initial_mass_to_light,
     brightest_galaxy_centers,
-    brightest_galaxy_centers_fast,
+    get_group_centres,
+    calculate_group_dynamical_masses,
+    fit_log_luminosity_log_mass_relation,
 )
 from luminosity_mass_funcs import (
     k_corr,
     generate_hmf,
     abundance_match_halo_masses,
     linear_stellar_mass2halo_mass,
+    stellar2halo_mass_van_kampen,
     linear_luminosity2halo_mass,
-    red_blue_linear_luminosity2halo_mass
+    stellar2halo_mass_li,
+    red_blue_linear_luminosity2halo_mass, 
+    compute_smf_magnitude_limit_empirical_grid, 
+    get_stellar_mass_correction_factors_array
 )
 from group_finding_funcs import update_group_membership_halofinder
+from halo_p_M_funcs import find_halo_r
 from utils import ConfigReader
 from bijective_matching import s_score
 
 # To do list - For MVP
-# 5logh needs to be in magnitudes, which are all in absolute mags
+# //TODO fix stellar mass assignment as a function of redshift (currently just using one relation for all redshifts, but should be evolving)
 # //TODO fix high mass end of hmf (where i always get 1 of the highest possible mass in the hmf range)
 
 
 # For paper
-# Implement completeness correction
-# Implement correction for survey edges (could this be related to above?)
-# Think of novel way of adding photo-zs
+# maybe to edge reflection for completeness
+
 
 
 # ------------------------
@@ -90,31 +97,67 @@ class HaloFinder:
         self.survey_fractional_area = config_reader.get_survey_fractional_area()
 
         # Get setup options from config
-        setup_options = config_reader.get_setup_options()
-        self.max_iterations = setup_options["max_iterations"]
-        self.mag_limit = setup_options["survey_magnitude_limit"]
-        self.abs_mag_sun = setup_options["abs_solar_magnitude_in_band"]
-        self.remove_isolated_galaxies = setup_options["remove_isolated_galaxies"]
-        self.red_a_threshold = setup_options["red_a_threshold"]
-        self.red_b_threshold = setup_options["red_b_threshold"]
-        self.blue_a_threshold = setup_options["blue_a_threshold"]
-        self.blue_b_threshold = setup_options["blue_b_threshold"]
-        self.threshold_b_pivot = setup_options["threshold_b_pivot"]
-        self.shmr_slope = setup_options["shmr_slope"]
-        self.shmr_intercept = setup_options["shmr_intercept"]
-        self.lhmr_slope = setup_options["lhmr_slope"]
-        self.lhmr_intercept = setup_options["lhmr_intercept"]
-        self.lhmr_slope_red = setup_options["lhmr_slope_red"]
-        self.lhmr_intercept_red = setup_options["lhmr_intercept_red"]
-        self.lhmr_slope_blue = setup_options["lhmr_slope_blue"]
-        self.lhmr_intercept_blue = setup_options["lhmr_intercept_blue"]
+        finder_options = config_reader.get_finder_options()
+        threshold_options = config_reader.get_threshold_model_params()
+        shmr_params = config_reader.get_shmr_params()
+        lhmr_params = config_reader.get_lhmr_params()
+        red_blue_lhmr_params = config_reader.get_red_blue_lhmr_params()
+        lhmr_dynamical_params = config_reader.get_lhmr_dynamical_calibrated_params()
+
+        self.max_iterations = finder_options["max_iterations"]
+        self.mag_limit = finder_options["survey_magnitude_limit"]
+        self.abs_mag_sun = finder_options["abs_solar_magnitude_in_band"]
+        self.remove_isolated_galaxies = finder_options["remove_isolated_galaxies"]
+        self.centre_definition = finder_options.get("centre_definition", "bcg").lower()
+        if self.centre_definition not in ("bcg", "iter_centre"):
+            raise ValueError(
+                f"Unsupported finder_options.centre_definition='{self.centre_definition}'. "
+                "Expected one of: bcg, iter_centre."
+            )
+        self.centre_definition_code = 0 if self.centre_definition == "bcg" else 1
+
+        self.red_a_threshold = threshold_options["red_a_threshold"]
+        self.red_b_threshold = threshold_options["red_b_threshold"]
+        self.blue_a_threshold = threshold_options["blue_a_threshold"]
+        self.blue_b_threshold = threshold_options["blue_b_threshold"]
+        self.threshold_b_pivot = threshold_options["threshold_b_pivot"]
+        self.completeness_coefficient = threshold_options.get(
+            "completeness_coefficient", 0.0
+        )
+
+        self.shmr_slope = shmr_params["shmr_slope"]
+        self.shmr_intercept = shmr_params["shmr_intercept"]
+        self.shmr_method = shmr_params.get("method", "linear")
+        self.lhmr_slope = lhmr_params["lhmr_slope"]
+        self.lhmr_intercept = lhmr_params["lhmr_intercept"]
+        self.lhmr_slope_red = red_blue_lhmr_params["lhmr_slope_red"]
+        self.lhmr_intercept_red = red_blue_lhmr_params["lhmr_intercept_red"]
+        self.lhmr_slope_blue = red_blue_lhmr_params["lhmr_slope_blue"]
+        self.lhmr_intercept_blue = red_blue_lhmr_params["lhmr_intercept_blue"]
+
+        self.lhmr_dyn_A = lhmr_dynamical_params.get("A", 1.0)
+        self.lhmr_dyn_min_group_members = lhmr_dynamical_params.get("min_group_members", 5)
+        self.lhmr_dyn_current_slope = self.lhmr_slope
+        self.lhmr_dyn_current_intercept = self.lhmr_intercept
 
         # self.b_threshold = setup_options.get('b_threshold', 0.0)
 
         # Get file paths from config
         file_locations = config_reader.get_file_locations()
         self.data_load_path = file_locations["galaxy_catalog_path"]
-        self.save_path = file_locations["galaxy_group_path"]
+        configured_group_save_path = Path(file_locations["galaxy_group_path"])
+        self.save_path = str(configured_group_save_path.with_suffix(".parquet"))
+        default_group_properties_path = str(
+            Path(self.save_path).with_suffix("").with_name(
+                f"{Path(self.save_path).with_suffix('').name}_properties"
+            )
+        ) + ".parquet"
+        configured_group_properties_path = file_locations.get(
+            "group_properties_path", default_group_properties_path
+        )
+        self.group_properties_save_path = str(
+            Path(configured_group_properties_path).with_suffix(".parquet")
+        )
         self.plot_save_dir = file_locations["plots_dir"]
         self.s_tot_save_path = file_locations["s_tot_path"]
 
@@ -157,6 +200,7 @@ class HaloFinder:
             self.h,
             self.remove_isolated_galaxies,
             self.mass_assignment_mode,
+            self.config_reader.get_column_names().get("completeness"),
         )
 
     def _get_cache(self):
@@ -181,6 +225,7 @@ class HaloFinder:
             self.abs_mag = cached["abs_mag"].copy()
             self.k_corr = cached["k_corr"].copy()
             self.is_red = cached["is_red"].copy()
+            self.completeness = cached["completeness"].copy()
             if self.mass_assignment_mode == "shmr":
                 self.stellar_mass = cached["stellar_mass"].copy()
             self.id_group_sky = cached["id_group_sky"].copy()
@@ -197,7 +242,7 @@ class HaloFinder:
         # Extract data using configured column names
         try:
             # Required columns
-            self.gal_ids = np.array(data[column_names["galaxy_id"]], dtype="int32")
+            self.gal_ids = np.array(data[column_names["galaxy_id"]], dtype="int64")
             self.zobs = np.array(data[column_names["redshift"]], dtype="float64")
             self.ra = np.array(data[column_names["ra"]], dtype="float64")
             self.dec = np.array(data[column_names["dec"]], dtype="float64")
@@ -206,6 +251,13 @@ class HaloFinder:
             )
             self.k_corr = np.array(data[column_names["k_correction"]], dtype="float64")
             self.is_red = np.array(data[column_names["galaxy_is_red"]], dtype=bool)
+            completeness_column = column_names.get("completeness")
+            if completeness_column is None:
+                self.completeness = np.ones(len(self.gal_ids), dtype="float64")
+            else:
+                self.completeness = np.array(
+                    data[completeness_column], dtype="float64"
+                )
             if self.mass_assignment_mode == "shmr":
                 self.stellar_mass = np.array(
                     data[column_names["stellar_mass"]], dtype="float64"
@@ -214,7 +266,7 @@ class HaloFinder:
             # Handle group ID - might be same as galaxy ID for some datasets
             if "group_id" in column_names and column_names["group_id"] in data.colnames:
                 self.id_group_sky = np.array(
-                    data[column_names["group_id"]], dtype="int32"
+                    data[column_names["group_id"]], dtype="int64"
                 )
             else:
                 run_options = self.config_reader.get_run_options()
@@ -239,6 +291,7 @@ class HaloFinder:
                 self.id_group_sky = self.id_group_sky[mask]
                 self.k_corr = self.k_corr[mask]
                 self.is_red = self.is_red[mask]
+                self.completeness = self.completeness[mask]
                 if self.mass_assignment_mode == "shmr":
                     self.stellar_mass = self.stellar_mass[mask]
                 logging.info(
@@ -265,6 +318,7 @@ class HaloFinder:
                 "abs_mag": self.abs_mag.copy(),
                 "k_corr": self.k_corr.copy(),
                 "is_red": self.is_red.copy(),
+                "completeness": self.completeness.copy(),
                 "id_group_sky": self.id_group_sky.copy(),
             }
             if self.mass_assignment_mode == "shmr":
@@ -310,10 +364,10 @@ class HaloFinder:
         self.gal_DMs = get_all_comoving_distance(self.zobs, self.omega_matter)
         if self.make_plots:
             plt.hist(self.gal_DMs)
-            plt.title("Galaxy Distance moduli")
-            plt.ylabel("Freq.")
-            plt.xlabel("Comoving Distance, Mpc")
-            plt.savefig(f"{self.plot_save_dir}/galaxy_distance_moduli.png")
+            plt.title("Galaxy Comoving Distance Distribution")
+            plt.ylabel("Frequency")
+            plt.xlabel("Comoving Distance [Mpc]")
+            plt.savefig(f"{self.plot_save_dir}/galaxy_comoving_distance_distribution.png")
             plt.clf()
         logging.info("Comoving distances generated.")
         if cache is not None:
@@ -342,9 +396,9 @@ class HaloFinder:
 
         if self.make_plots:
             plt.hist(np.log10(self.gal_luminosities), log=True)
-            plt.title("Initial galaxy luminosities")
-            plt.ylabel("Freq.")
-            plt.xlabel("log10(Luminosity / $10^{14}h^{-1}$)")
+            plt.title("Initial Galaxy Luminosity Distribution")
+            plt.ylabel("Frequency")
+            plt.xlabel(r"log10(Galaxy Luminosity [$10^{14} h^{-2} L_{\odot}$])")
             plt.savefig(f"{self.plot_save_dir}/initial_galaxy_luminosities.png")
             plt.clf()
 
@@ -353,9 +407,19 @@ class HaloFinder:
     def initial_mass_assignment(self):
         logging.info("Generating initial halo masses from mass-to-light ratio...")
         self.group_halo_masses = find_all_initial_mass_to_light(
-            self.group_luminosities, 500.0
+            self.group_luminosities, 100.0
         )
         logging.info("Initial halo masses assigned.")
+
+    
+    def generate_smhr_redshift_correction_factor_grid(self):
+        logging.info("Generating SHMR redshift correction factor grid...")
+        self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid = compute_smf_magnitude_limit_empirical_grid(self.zobs, np.log10(self.stellar_mass))
+        logging.info("SHMR redshift correction factor grid generated.")
+        #plt.scatter(self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid)
+        #plt.title('stellarmass com grid')
+        #plt.show()
+
 
     def initial_group_central_satellite_assignment(self):
         """
@@ -369,7 +433,7 @@ class HaloFinder:
             len(self.gal_ids), dtype=bool
         )  # No satellites initially
         self.group_ids = np.arange(
-            len(self.gal_ids), dtype="int32"
+            len(self.gal_ids), dtype="int64"
         )  # Each galaxy is its own group initially
         self.iteration_group_membership[str(self.iteration_counter)] = (
             self.group_ids.copy()
@@ -395,10 +459,11 @@ class HaloFinder:
             self.group_centres_z,
             self.group_luminosities,
             self.group_stellar_masses,
+            self.group_stellar_mass_3_biggest,
             self.group_bcg_abs_mag,
             self.group_sizes,
             self.group_bcg_is_red,
-        ) = brightest_galaxy_centers_fast(
+        ) = get_group_centres(
             self.gal_luminosities,
             stellar_mass,
             self.abs_mag,
@@ -413,6 +478,8 @@ class HaloFinder:
             self.mag_limit,
             self.omega_matter,
             self.h,
+            self.abs_mag_sun,
+            self.centre_definition_code,
         )
         logging.info("Group properties and centres updated.")
 
@@ -426,40 +493,74 @@ class HaloFinder:
 
         if self.make_plots:
             plt.hist(np.log10(self.group_luminosities * 1e14), log=True, bins=25)
-            plt.title("Halo Luminosity Histogram Pre Mass Assignment")
+            plt.title("Group Luminosity Distribution Before Mass Assignment")
+            plt.xlabel(r"log10(Group Luminosity [$h^{-2} L_{\odot}$])")
+            plt.ylabel("Frequency")
             plt.savefig(
-                f"{self.plot_save_dir}/halo_luminosities_iter_{self.iteration_counter}_pre_mass_assignment.png"
+                f"{self.plot_save_dir}/group_luminosities_iter_{self.iteration_counter}_pre_mass_assignment.png"
             )
             plt.clf()
             plt.hist(self.group_bcg_k_corrs)
-            plt.title("Group K-corrections")
+            plt.title("Group BCG K-Correction Distribution")
+            plt.xlabel("K-correction [mag]")
+            plt.ylabel("Frequency")
             plt.savefig(
-                f"{self.plot_save_dir}/group_k_corrections_iter_{self.iteration_counter}.png"
+                f"{self.plot_save_dir}/group_bcg_k_corrections_iter_{self.iteration_counter}.png"
             )
             plt.clf()
 
             plt.hist(self.group_magnitudes, log=True, bins=25)
-            plt.title("Halo Magnitude Histogram Pre Mass Assignment")
-            plt.xlabel("Absolute Magnitude")
+            plt.title("Group Absolute Magnitude Distribution Before Mass Assignment")
+            plt.xlabel("Absolute Magnitude [mag]")
+            plt.ylabel("Frequency")
             plt.savefig(
-                f"{self.plot_save_dir}/halo_magnitudes_iter_{self.iteration_counter}_pre_mass_assignment.png"
+                f"{self.plot_save_dir}/group_magnitudes_iter_{self.iteration_counter}_pre_mass_assignment.png"
             )
             plt.clf()
 
             plt.hist(self.group_centres_z)
-            plt.title("Group Redshift Histogram")
+            plt.title("Group Redshift Distribution")
             plt.xlabel("Redshift")
+            plt.ylabel("Frequency")
             plt.savefig(
                 f"{self.plot_save_dir}/group_redshifts_iter_{self.iteration_counter}.png"
             )
             plt.clf()
 
         if self.mass_assignment_mode == "shmr":
-            self.group_halo_masses = linear_stellar_mass2halo_mass(self.group_stellar_masses, self.shmr_intercept, self.shmr_slope)
+            logging.info('Finding stellar mass correction factor')
+            stellar_mass_corr_factors = get_stellar_mass_correction_factors_array(self.group_centres_z, self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid)
+            #plt.hist(stellar_mass_corr_factors)
+            #plt.title('corr_factor_hist')
+            #plt.show()
+            self.group_stellar_masses = self.group_stellar_masses * stellar_mass_corr_factors
+            
+            logging.info('Stellar mass correction factor found')
+            if self.shmr_method == "van_Kampen":
+                self.group_halo_masses = stellar2halo_mass_van_kampen(self.group_stellar_mass_3_biggest, self.h)
+
+            if self.shmr_method == "Li":
+                self.group_halo_masses = stellar2halo_mass_li(self.group_stellar_masses, self.h)
+            else:
+                self.group_halo_masses = linear_stellar_mass2halo_mass(
+                    self.group_stellar_masses,
+                    self.shmr_intercept,
+                    self.shmr_slope,
+                )
 
 
         elif self.mass_assignment_mode == 'lhmr':
             self.group_halo_masses = linear_luminosity2halo_mass(self.group_luminosities, self.lhmr_intercept, self.lhmr_slope)
+
+        elif self.mass_assignment_mode == 'lhmr_dynamical_calibrated':
+            if self.iteration_counter == 0:
+                self.group_halo_masses = find_all_initial_mass_to_light(self.group_luminosities, 100.0)
+            else:
+                self.group_halo_masses = linear_luminosity2halo_mass(
+                    self.group_luminosities,
+                    self.lhmr_dyn_current_intercept,
+                    self.lhmr_dyn_current_slope,
+                )
 
         elif self.mass_assignment_mode == 'red_blue_lhmr':
             self.group_halo_masses = red_blue_linear_luminosity2halo_mass(
@@ -485,7 +586,10 @@ class HaloFinder:
             )
 
         if self.make_plots:
-            plt.hist(np.log10(1e14 * self.group_halo_masses), log=True, bins=25)
+            plt.hist(self.group_halo_masses, log=True, bins=25)
+            plt.title("Group Halo Mass Distribution After Mass Assignment")
+            plt.xlabel(r"Group Halo Mass [log10($M_{\odot} h^{-1}$)]")
+            plt.ylabel("Frequency")
             plt.savefig(
                 f"{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}_post_mass_assignment.png"
             )
@@ -493,9 +597,10 @@ class HaloFinder:
 
         logging.info("Halo masses updated.")
 
+
     def apply_halo_finder(self):
         logging.info("Performing iteration of group finder")
-        if self.mass_assignment_mode == "shmr" or self.mass_assignment_mode == "lhmr" or self.mass_assignment_mode == "red_blue_lhmr":
+        if self.mass_assignment_mode in ("shmr", "lhmr", "red_blue_lhmr"):
             use_active_groups = self.active_group_ids is not None
             if use_active_groups:
                 logging.info(
@@ -516,6 +621,7 @@ class HaloFinder:
                 self.ra,
                 self.dec,
                 self.zobs,
+                self.completeness,
                 self.group_ids,
                 self.unique_groups,
                 self.group_centres_ra,
@@ -534,6 +640,7 @@ class HaloFinder:
                 self.threshold_b_pivot,
                 self.omega_matter,
                 self.h,
+                self.completeness_coefficient,
                 active_group_ids,
                 use_active_groups,
             )
@@ -542,11 +649,111 @@ class HaloFinder:
             f"Groupfinder iteration complete, number of groups found: {len(np.unique(self.new_members))}"
         )
 
+    def update_lhmr_dynamical_calibration(self):
+        logging.info("Updating dynamical LHMR calibration...")
+        if self.mass_assignment_mode != "lhmr_dynamical_calibrated":
+            return
+
+        group_dynamical_masses = calculate_group_dynamical_masses(
+            self.group_ids,
+            self.unique_groups,
+            self.zobs,
+            self.ra,
+            self.dec,
+            self.group_centres_ra,
+            self.group_centres_dec,
+            self.group_centres_z,
+            self.group_sizes,
+            self.lhmr_dyn_A,
+            self.omega_matter,
+        )
+
+        slope, intercept, n_used = fit_log_luminosity_log_mass_relation(
+            self.group_luminosities,
+            group_dynamical_masses,
+            self.group_sizes,
+            self.lhmr_dyn_min_group_members,
+        )
+
+        if np.isfinite(slope) and np.isfinite(intercept):
+            self.lhmr_dyn_current_slope = slope
+            self.lhmr_dyn_current_intercept = intercept
+            logging.info(
+                "Updated dynamical LHMR calibration using %d groups: slope=%.4f intercept=%.4f",
+                n_used,
+                slope,
+                intercept,
+            )
+        else:
+            logging.warning(
+                "Could not update dynamical LHMR calibration (valid groups=%d); retaining previous slope/intercept",
+                n_used,
+            )
+
+        if self.make_plots:
+            # Plot dynamical mass vs group luminosity with the fitted relation
+            plt.scatter(
+                np.log10(self.group_luminosities * 1e14),
+                group_dynamical_masses,
+                s=0.1,
+            )
+            x = np.linspace(
+                np.min(self.group_luminosities * 1e14),
+                np.max(self.group_luminosities * 1e14),
+                100,
+            )
+            y = 10 ** (self.lhmr_dyn_current_intercept + self.lhmr_dyn_current_slope * np.log10(x))
+            plt.plot(np.log10(x), np.log10(y), color="red", label="Fitted LHMR")
+            plt.title("Dynamical Mass vs Group Luminosity with Fitted LHMR")
+            plt.xlabel(r"log10(Group Luminosity [$h^{-2} L_{\odot}$])")
+            plt.ylabel(r"log10(Dynamical Mass [$M_{\odot} h^{-1}$])")
+            plt.legend()
+            plt.savefig(
+                f"{self.plot_save_dir}/dynamical_mass_vs_luminosity_iter_{self.iteration_counter}.png"
+            )
+            plt.clf()
+            
+
+
     def save_galaxy_groups(self):
         logging.info(f"Saving galaxy groups at the location: {self.save_path}")
-        header = "id_galaxy_sky\tid_finder_group"
-        data = np.column_stack((self.gal_ids, self.group_ids))
-        np.savetxt(self.save_path, data, header=header)
+        galaxy_groups_table = Table(
+            {
+                "galaxy_id": self.gal_ids,
+                "group_id_finder": self.group_ids,
+            }
+        )
+        galaxy_groups_table.write(
+            self.save_path, format="parquet", overwrite=True
+        )
+
+        logging.info(
+            f"Saving group properties at the location: {self.group_properties_save_path}"
+        )
+        group_radii_mpc = find_halo_r(
+            self.group_halo_masses, self.group_centres_z, self.omega_matter
+        ) / self.h
+        group_properties_table = Table(
+            {
+                "group_id": self.unique_groups,
+                "centre_ra": self.group_centres_ra,
+                "centre_dec": self.group_centres_dec,
+                "centre_redshift": self.group_centres_z,
+                "halo_mass": self.group_halo_masses,
+                "luminosity": self.group_luminosities,
+                "stellar_mass": self.group_stellar_masses,
+                "stellar_mass_3_biggest": self.group_stellar_mass_3_biggest,
+                "bcg_abs_mag": self.group_bcg_abs_mag,
+                "multiplicity": self.group_sizes,
+                "bcg_is_red": self.group_bcg_is_red,
+                "radius": group_radii_mpc,
+            }
+        )
+        group_properties_table.write(
+            self.group_properties_save_path,
+            format="parquet",
+            overwrite=True,
+        )
 
     def iterate_halo_finder(self):
         self.active_group_ids = None
@@ -579,6 +786,8 @@ class HaloFinder:
                 )
                 self.group_ids = self.new_members.copy()
                 self.update_group_luminosity_and_centres()
+                if self.mass_assignment_mode == "lhmr_dynamical_calibrated":
+                    self.update_lhmr_dynamical_calibration()
                 self.update_group_halo_masses()
                 self.debugging_plots()
                 logging.info(f"Iteration number : {self.iteration_counter} complete")
@@ -601,17 +810,17 @@ class HaloFinder:
 
         self.s_tot = score
         # Save the S-score to a file
-        np.savetxt(self.s_tot_save_path + "_B:", [score], header="S-score", fmt="%.6f")
+        np.savetxt(self.s_tot_save_path + 'b_score.txt', [score], header="S-score", fmt="%.6f")
 
     def debugging_plots(self):
         if not self.make_plots:
             return
         logging.info("Creating debugging plots...")
         # Halo masses
-        plt.hist(np.log10(self.group_halo_masses * 1e14), log=True, bins=25)
-        plt.title("Halo Mass Histogram")
-        plt.xlabel("log10(Halo Mass / $h^{-1}$)")
-        plt.ylabel("Freq.")
+        plt.hist(self.group_halo_masses, log=True, bins=25)
+        plt.title("Group Halo Mass Distribution")
+        plt.xlabel(r"Group Halo Mass [log10($M_{\odot} h^{-1}$)]")
+        plt.ylabel("Frequency")
         plt.savefig(
             f"{self.plot_save_dir}/halo_masses_iter_{self.iteration_counter}.png"
         )
@@ -619,9 +828,9 @@ class HaloFinder:
 
         # Halo luminosities
         plt.hist(np.log10(self.group_luminosities * 1e14), log=True, bins=25)
-        plt.title("Halo Luminosity Histogram")
-        plt.xlabel("log10(Luminosity)")
-        plt.ylabel("Freq.")
+        plt.title("Group Luminosity Distribution")
+        plt.xlabel(r"log10(Group Luminosity [$h^{-2} L_{\odot}$])")
+        plt.ylabel("Frequency")
         plt.savefig(
             f"{self.plot_save_dir}/halo_luminosities_iter_{self.iteration_counter}.png"
         )
@@ -629,9 +838,9 @@ class HaloFinder:
 
         # Halo N
         plt.hist(self.group_sizes, log=True, bins=50)
-        plt.title("Halo Population counts")
-        plt.ylabel("Freq.")
-        plt.xlabel("Galaxy number count per halo")
+        plt.title("Group Membership Count Distribution")
+        plt.ylabel("Frequency")
+        plt.xlabel("Galaxy Count per Group")
         plt.savefig(
             f"{self.plot_save_dir}/halo_population_counts_iter_{self.iteration_counter}.png"
         )
@@ -639,9 +848,9 @@ class HaloFinder:
 
         # Halo locations
         plt.scatter(self.group_centres_ra, self.group_centres_dec, s=0.1)
-        plt.title("Halo locations")
-        plt.xlabel("RA")
-        plt.ylabel("Dec")
+        plt.title("Group Sky Positions")
+        plt.xlabel("Right Ascension [deg]")
+        plt.ylabel("Declination [deg]")
 
         plt.savefig(
             f"{self.plot_save_dir}/halo_locations_iter_{self.iteration_counter}.png"
@@ -652,25 +861,25 @@ class HaloFinder:
 
         plt.scatter(
             np.log10(self.group_stellar_masses),
-            np.log10(self.group_halo_masses * 1e14),
+            self.group_halo_masses,
             s=0.1,
         )
-        plt.title("Group stellar mass vs halo mass")
-        plt.xlabel("log10(Group stellar mass)")
-        plt.ylabel("log10(Halo Mass / $h^{-1}$)")
+        plt.title("Group Stellar Mass vs Halo Mass")
+        plt.xlabel(r"log10(Group Stellar Mass [$M_{\odot}$])")
+        plt.ylabel(r"Group Halo Mass [log10($M_{\odot} h^{-1}$)]")
         plt.savefig(
             f"{self.plot_save_dir}/halo_m_vs_stellar_m_iter_{self.iteration_counter}.png"
         )
         plt.clf()
 
         plt.scatter(
-            np.log10(self.group_halo_masses * 1e14),
+            self.group_halo_masses,
             np.log10(self.group_luminosities * 1e14),
             s=0.1,
         )
-        plt.title("Halo mass vs Luminosity")
-        plt.xlabel("log10(Halo Mass / h^{-1}$)")
-        plt.ylabel("log10(Luminosity /h^{-1}$)")
+        plt.title("Group Halo Mass vs Luminosity")
+        plt.xlabel(r"Group Halo Mass [log10($M_{\odot} h^{-1}$)]")
+        plt.ylabel(r"log10(Group Luminosity [$h^{-2} L_{\odot}$])")
 
         plt.savefig(
             f"{self.plot_save_dir}/halo_m_vs_l_iter_{self.iteration_counter}.png"
@@ -700,17 +909,25 @@ class RunHaloFinder(HaloFinder):
         self.load_catalogue_data()
         if self.mass_assignment_mode == "abundance_match":
             self.generate_hmf()
+        if self.mass_assignment_mode == 'shmr':
+            self.generate_smhr_redshift_correction_factor_grid()
+            
+
         self.get_all_comoving_distances()
         self.create_KDE_tree()
         self.initial_group_central_satellite_assignment()
         self.initial_luminosities()
         self.update_group_luminosity_and_centres()
+        if self.mass_assignment_mode in ("lhmr_dynamical_calibrated"):
+            self.lhmr_dyn_current_slope = self.lhmr_slope
+            self.lhmr_dyn_current_intercept = self.lhmr_intercept
         self.update_group_halo_masses()
         logging.info(f"Tunable parameters for this run:")
         logging.info(f"Red a threshold: {self.red_a_threshold}")
         logging.info(f"Red b threshold: {self.red_b_threshold}")
         logging.info(f"Blue a threshold: {self.blue_a_threshold}")
         logging.info(f"Blue b threshold: {self.blue_b_threshold}")
+        logging.info(f"Completeness coefficient: {self.completeness_coefficient}")
         self.iterate_halo_finder()
         if self.run_mock_comparion == True:
             self.s_score()
@@ -724,12 +941,16 @@ class RunHaloFinder(HaloFinder):
         self.initial_group_central_satellite_assignment()
         self.initial_luminosities()
         self.update_group_luminosity_and_centres()
+        if self.mass_assignment_mode in ("lhmr_dynamical_calibrated"):
+            self.lhmr_dyn_current_slope = self.lhmr_slope
+            self.lhmr_dyn_current_intercept = self.lhmr_intercept
         self.update_group_halo_masses()
         logging.info(f"Tunable parameters for this run:")
         logging.info(f"Red a threshold: {self.red_a_threshold}")
         logging.info(f"Red b threshold: {self.red_b_threshold}")
         logging.info(f"Blue a threshold: {self.blue_a_threshold}")
         logging.info(f"Blue b threshold: {self.blue_b_threshold}")
+        logging.info(f"Completeness coefficient: {self.completeness_coefficient}")
         self.iterate_halo_finder()
         if self.run_mock_comparion == True:
             self.s_score()

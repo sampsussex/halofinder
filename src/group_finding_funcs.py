@@ -1,4 +1,3 @@
-# Yang 07/21 groupfinder
 import numpy as np
 from numba import njit, prange, float64, int64
 from cosmo_funcs import (
@@ -6,13 +5,7 @@ from cosmo_funcs import (
     find_all_spherical_to_cartesian,
     spherical_to_cartesian,
 )
-from halo_p_M_funcs import find_p_M
-
-
-@njit
-def negative_exponential_func(x, B_a, B_b, B_c):
-    """A helper function to compute negative exponential values."""
-    return B_a * np.exp(-B_b * x) + B_c
+from halo_p_M_funcs import find_p_M_with_completeness
 
 
 @njit
@@ -28,6 +21,8 @@ def halo_mass_dependent_threshold(log_halo_mass, a, b, b_piv):
         float64[:],
         float64[:],
         float64[:],
+        float64[:],
+        float64,
         float64,
         float64,
         float64,
@@ -43,12 +38,14 @@ def compute_probabilities_parallel(
     galaxy_ra,
     galaxy_dec,
     galaxy_z,
+    galaxy_completeness,
     group_ra_i,
     group_dec_i,
     group_z_i,
     group_halo_mass_i,
     omega_matter,
     h,
+    completeness_coefficient,
 ):
     """Helper function to compute probabilities in parallel"""
     probs = np.zeros(len(indices), dtype=np.float64)
@@ -56,7 +53,7 @@ def compute_probabilities_parallel(
     for j in prange(len(indices)):
         neighbor_idx = indices[j]
         if neighbor_idx != central_idx:
-            probs[j] = find_p_M(
+            probs[j] = find_p_M_with_completeness(
                 galaxy_ra[neighbor_idx],
                 galaxy_dec[neighbor_idx],
                 group_ra_i,
@@ -66,6 +63,8 @@ def compute_probabilities_parallel(
                 group_halo_mass_i,
                 omega_matter,
                 h,
+                galaxy_completeness[neighbor_idx],
+                completeness_coefficient,
             )
         else:
             probs[j] = -1.0
@@ -78,6 +77,7 @@ def update_group_membership_halofinder(
     galaxy_ra,
     galaxy_dec,
     galaxy_z,
+    galaxy_completeness,
     galaxy_group_id,
     group_ids,
     group_ra,
@@ -96,6 +96,7 @@ def update_group_membership_halofinder(
     b_piv,
     omega_matter,
     h,
+    completeness_coefficient,
     active_group_ids,
     use_active_groups,
 ):
@@ -112,7 +113,7 @@ def update_group_membership_halofinder(
     - group_dec: Declination of groups in degrees
     - group_z: Redshift of groups
     - group_sizes: Sizes of each group (number of galaxies in each group)
-    - group_halo_mass: Halo mass of each group in units of 10^14 h^-1 M_sun
+    - group_halo_mass: Halo mass of each group in units of log10(Msun/h)
     - galaxy_tree: KDTree for galaxy positions in spherical coordinates
     - is_central: input boolean array indicating current central galaxies
     - is_satellite: input boolean array indicating current satellite galaxies
@@ -210,12 +211,14 @@ def update_group_membership_halofinder(
             galaxy_ra,
             galaxy_dec,
             galaxy_z,
+            galaxy_completeness,
             group_ra[group_idx],
             group_dec[group_idx],
             group_z[group_idx],
             group_halo_mass[group_idx],
             omega_matter,
             h,
+            completeness_coefficient,
         )
 
         # Apply membership updates (sequential)
@@ -254,7 +257,7 @@ def update_group_membership_halofinder(
                     continue
 
             # Assign as satellite if probability exceeds threshold
-            log_halo_mass = np.log10(group_halo_mass[group_idx] * 1e14)
+            log_halo_mass = group_halo_mass[group_idx]
             if is_red[neighbor_idx]:
                 threshold = halo_mass_dependent_threshold(
                     log_halo_mass,
