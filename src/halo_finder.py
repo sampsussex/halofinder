@@ -27,8 +27,8 @@ from luminosity_mass_funcs import (
     linear_luminosity2halo_mass,
     stellar2halo_mass_li,
     red_blue_linear_luminosity2halo_mass, 
-    compute_smf_magnitude_limit_empirical_grid, 
-    get_stellar_mass_correction_factors_array
+    build_smf_correction_grid, 
+    apply_smf_correction,
 )
 from group_finding_funcs import update_group_membership_halofinder
 from halo_p_M_funcs import find_halo_r
@@ -414,7 +414,7 @@ class HaloFinder:
     
     def generate_smhr_redshift_correction_factor_grid(self):
         logging.info("Generating SHMR redshift correction factor grid...")
-        self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid = compute_smf_magnitude_limit_empirical_grid(self.zobs, np.log10(self.stellar_mass))
+        self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid = build_smf_correction_grid(self.zobs, np.log10(self.stellar_mass))
         logging.info("SHMR redshift correction factor grid generated.")
         #plt.scatter(self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid)
         #plt.title('stellarmass com grid')
@@ -529,10 +529,8 @@ class HaloFinder:
 
         if self.mass_assignment_mode == "shmr":
             logging.info('Finding stellar mass correction factor')
-            stellar_mass_corr_factors = get_stellar_mass_correction_factors_array(self.group_centres_z, self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid)
-            #plt.hist(stellar_mass_corr_factors)
-            #plt.title('corr_factor_hist')
-            #plt.show()
+            stellar_mass_corr_factors = apply_smf_correction(self.group_centres_z, self.shmr_correction_z_grid, self.shmr_correction_stellarmass_grid)
+
             self.group_stellar_masses = self.group_stellar_masses * stellar_mass_corr_factors
             
             logging.info('Stellar mass correction factor found')

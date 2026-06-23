@@ -259,15 +259,104 @@ def stellar_mass_correction_factor(z, z_smf_correction_grid, stellarmass_smf_cor
 @njit
 def get_stellar_mass_correction_factors_array(
     zs,
-    z_smf_correction_grid, stellarmass_smf_correction_grid,
+    z_smf_correction_grid, stellarmass_smf_limit_correction_grid,
     ):
     stellarmass_correction_factors = np.zeros_like(zs)
     for i in prange(len(zs)):
         stellarmass_correction_factors[i] = stellar_mass_correction_factor(
-            zs[i], z_smf_correction_grid, stellarmass_smf_correction_grid)
+            zs[i], z_smf_correction_grid, stellarmass_smf_limit_correction_grid)
 
     return stellarmass_correction_factors
-   # phi_star1=10**(-2.437+0.0807), phi_star2=10**(-3.201+0.0807), log_M_star=10.745, alpha1=-0.466, alpha2=-1.530,
+
+
+
+@njit
+def build_smf_correction_grid(
+    survey_zs,
+    survey_stellar_masses,
+    phi_star1=10 ** (-2.437 + 0.0807),
+    phi_star2=10 ** (-3.201 + 0.0807),
+    log_M_star=10.745,
+    alpha1=-0.466,
+    alpha2=-1.530,
+    n_mass_bins=25,
+    n_z_nodes=200,
+):
+    """
+    Precompute the SMF stellar-mass correction factor on a fine redshift grid.
+
+    Combines the two previous steps (empirical completeness limit + per-z
+    integral ratio) into a single build function that you call once.
+
+    Parameters
+    ----------
+    survey_zs, survey_stellar_masses : array-like
+        Redshifts and log10(M/M_sun) for all galaxies in the survey.
+        Used only to derive the empirical mass-completeness limit grid.
+    phi_star1, phi_star2, log_M_star, alpha1, alpha2 : float
+        Double-Schechter parameters (Driver+22 z=0 defaults).
+    n_mass_bins : int
+        Number of redshift bins used by compute_smf_magnitude_limit_empirical_grid.
+    n_z_nodes : int
+        Number of redshift nodes on which to evaluate the correction factor.
+        More nodes → smoother interpolation; 200 is plenty for smooth results.
+
+    Returns
+    -------
+    z_corr_grid : np.ndarray, shape (n_z_nodes,)
+        Redshift nodes (linearly spaced between survey min and max).
+    correction_grid : np.ndarray, shape (n_z_nodes,)
+        Correction factor >= 1 at each node.
+    """
+    # Step 1: empirical completeness limit (cheap, vectorised)
+    z_limit_grid, mass_limit_grid = compute_smf_magnitude_limit_empirical_grid(
+        survey_zs, survey_stellar_masses, n_bins=n_mass_bins
+    )
+
+    # Step 2: evaluate the correction factor at each z node (expensive — done once)
+    survey_zs = np.asarray(survey_zs)
+    z_corr_grid = np.linspace(survey_zs.min(), survey_zs.max(), n_z_nodes)
+    correction_grid = np.empty(n_z_nodes)
+
+    for i, z in enumerate(z_corr_grid):
+        correction_grid[i] = stellar_mass_correction_factor(
+            z,
+            z_limit_grid,
+            mass_limit_grid,
+            phi_star1=phi_star1,
+            phi_star2=phi_star2,
+            log_M_star=log_M_star,
+            alpha1=alpha1,
+            alpha2=alpha2,
+        )
+
+    return z_corr_grid, correction_grid
+
+
+@njit
+def apply_smf_correction(zs, z_corr_grid, correction_grid):
+    """
+    Return per-galaxy correction factors by interpolating the precomputed grid.
+
+    This is the fast, call-many-times counterpart to build_smf_correction_grid.
+    Redshifts outside the grid range are clamped to the nearest edge value
+    (standard np.interp behaviour).
+
+    Parameters
+    ----------
+    zs : array-like, shape (N,)
+        Redshifts of the galaxies you want to correct.
+    z_corr_grid : np.ndarray
+        Redshift nodes returned by build_smf_correction_grid.
+    correction_grid : np.ndarray
+        Correction factors returned by build_smf_correction_grid.
+
+    Returns
+    -------
+    np.ndarray, shape (N,)
+        Correction factor >= 1 for each galaxy.
+    """
+    return np.interp(np.asarray(zs), z_corr_grid, correction_grid)
 
 
 def generate_hmf(hmf_z, m_min, m_max, dlog10m, h, omega_matter):
