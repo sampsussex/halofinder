@@ -40,9 +40,9 @@ finder_options:
   centre_definition: "iter_centre" # bcg, iter_centre
 
 threshold_model_params:
-  red_a_threshold: 3.2 #1.7
+  red_a_threshold: 1.9 #1.7
   red_b_threshold: 0.
-  blue_a_threshold: 3.2 # 2.9
+  blue_a_threshold: 4.2 # 2.9
   blue_b_threshold: 0.
   threshold_b_pivot: 13.0
   completeness_coefficient: 0.35
@@ -56,7 +56,7 @@ abundance_match_params:
 shmr_params:
   shmr_slope: 1.21
   shmr_intercept: -0.55
-  method: "Li" # Linear, van_Kampen, Li
+  method: "constant" # Linear, van_Kampen, Li
 
 lhmr_params:
   lhmr_slope: 1.465

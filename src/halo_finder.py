@@ -537,16 +537,15 @@ class HaloFinder:
             
             logging.info('Stellar mass correction factor found')
             if self.shmr_method == "van_Kampen":
+                logging.info("Using van Kampen SHMR with group stellar mass of 3 biggest galaxies as input")
                 self.group_halo_masses = stellar2halo_mass_van_kampen(self.group_stellar_mass_3_biggest, self.h)
 
             if self.shmr_method == "Li":
+                logging.info("Using Li SHMR with group stellar mass galaxies as input")
                 self.group_halo_masses = stellar2halo_mass_li(self.group_stellar_masses, self.h)
-            else:
-                self.group_halo_masses = linear_stellar_mass2halo_mass(
-                    self.group_stellar_masses,
-                    self.shmr_intercept,
-                    self.shmr_slope,
-                )
+            if self.shmr_method == "constant":
+                logging.info("Using constant SHMR with halo mass of 10^13 Msun/h for all groups")
+                self.group_halo_masses = np.log10(self.group_stellar_masses * 200)
 
 
         elif self.mass_assignment_mode == 'lhmr':
